@@ -23,7 +23,7 @@ app.use(cors({
 app.use(express.json());
 
 // Use Routes
-app.use('/api', authRoutes);
+app.use('/api/auth', authRoutes);
 
 app.get('/', (req, res) => {
     res.send('Backend is Working Correctly');

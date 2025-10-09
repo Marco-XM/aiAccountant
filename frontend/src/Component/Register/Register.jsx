@@ -30,7 +30,7 @@ const Register = () => {
         email: values.email,
         password: values.password,
       };
-      const { data } = await axios.post("http://localhost:5000/api/register", payload);
+      const { data } = await axios.post("http://localhost:5000/api/auth/register", payload);
       
       if (data.success) {
         toast.success(data.message || "Registration successful");
