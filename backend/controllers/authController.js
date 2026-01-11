@@ -5,7 +5,7 @@ const jwt = require('jsonwebtoken');
 const JWT_SECRET = process.env.JWT_SECRET || 'a2bec79f51d4bc62954b6e7453870bf5a270bd742cf1b14096818384ea4b5163ac8c62a87a0843904bcaf2b6ec29efe0d4fd8b12401130ba250e69e14c14749c';
 
 const register = async (req, res) => {
-    const {name, email, password} = req.body;
+    const {name, email, password, businessType} = req.body;
 
     try {
         const existingUser = await User.findOne({email});
@@ -18,7 +18,8 @@ const register = async (req, res) => {
         const newUser = new User({
             name,
             email,
-            password: hashedPassword
+            password: hashedPassword,
+            businessType
         });
 
         await newUser.save();
