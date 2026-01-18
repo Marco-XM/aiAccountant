@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Setup Resend - Get Your API Key</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 800px;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #00ADB5 0%, #00d4dd 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 18px;
+            opacity: 0.95;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .step {
+            background: #f8f9fa;
+            border-left: 4px solid #00ADB5;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+        }
+
+        .step h3 {
+            color: #222831;
+            margin-bottom: 15px;
+            font-size: 20px;
+        }
+
+        .step-number {
+            display: inline-block;
+            width: 32px;
+            height: 32px;
+            background: #00ADB5;
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 32px;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        .button {
+            display: inline-block;
+            background: #00ADB5;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: bold;
+            margin: 10px 5px;
+            transition: all 0.3s;
+        }
+
+        .button:hover {
+            background: #009499;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 173, 181, 0.4);
+        }
+
+        .button.secondary {
+            background: #6c757d;
+        }
+
+        .button.secondary:hover {
+            background: #5a6268;
+        }
+
+        .code-block {
+            background: #2d3748;
+            color: #68d391;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            overflow-x: auto;
+            margin: 15px 0;
+        }
+
+        .warning {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            color: #856404;
+        }
+
+        .success {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            color: #155724;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            font-family: 'Courier New', monospace;
+            margin: 10px 0;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #00ADB5;
+        }
+
+        .copy-btn {
+            background: #28a745;
+            border: none;
+            cursor: pointer;
+        }
+
+        .copy-btn:hover {
+            background: #218838;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        .status.pending {
+            background: #ffc107;
+            color: #856404;
+        }
+
+        .status.ready {
+            background: #28a745;
+            color: white;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Email Setup - Final Step</h1>
+            <p>Get your free Resend API key to enable email sending</p>
+        </div>
+
+        <div class="content">
+            <div class="success">
+                <strong>✅ Backend is ready!</strong> Everything is configured and waiting for your API key.
+            </div>
+
+            <div class="step">
+                <h3><span class="step-number">1</span> Create Free Resend Account</h3>
+                <p>Resend offers 3,000 free emails per month. No credit card required.</p>
+                <a href="https://resend.com/signup" target="_blank" class="button">Sign Up at Resend →</a>
+            </div>
+
+            <div class="step">
+                <h3><span class="step-number">2</span> Get Your API Key</h3>
+                <p>After signing up, create an API key:</p>
+                <ol style="margin: 15px 0 15px 20px; line-height: 1.8;">
+                    <li>Go to <strong>API Keys</strong> section</li>
+                    <li>Click <strong>"Create API Key"</strong></li>
+                    <li>Name it: <code>AI Accountant</code></li>
+                    <li>Select permission: <strong>"Sending access"</strong></li>
+                    <li>Click <strong>"Add"</strong> and copy the key</li>
+                </ol>
+                <a href="https://resend.com/api-keys" target="_blank" class="button secondary">Go to API Keys →</a>
+            </div>
+
+            <div class="step">
+                <h3><span class="step-number">3</span> Paste Your API Key</h3>
+                <p>Enter your API key below (starts with <code>re_</code>):</p>
+                <input type="text" id="apiKey" placeholder="re_abc123xyz..." />
+                <button class="button" onclick="updateEnvFile()">Save & Test</button>
+            </div>
+
+            <div class="warning">
+                <strong>⚠️ Manual Method:</strong> If the automatic save doesn't work, manually update:
+                <div class="code-block">E:\AiChatbot\aiAccountant\backend\.env</div>
+                Add these lines:
+                <div class="code-block">RESEND_API_KEY=re_your_key_here
+                    RESEND_FROM_EMAIL=onboarding@resend.dev</div>
+                Then restart the backend server.
+            </div>
+
+            <div id="result"></div>
+        </div>
+    </div>
+
+    <script>
+        async function updateEnvFile() {
+            const apiKey = document.getElementById('apiKey').value.trim();
+            const resultDiv = document.getElementById('result');
+
+            if (!apiKey) {
+                resultDiv.innerHTML = '<div class="warning"><strong>⚠️ Error:</strong> Please enter your API key</div>';
+                return;
+            }
+
+            if (!apiKey.startsWith('re_')) {
+                resultDiv.innerHTML = '<div class="warning"><strong>⚠️ Error:</strong> API key should start with "re_"</div>';
+                return;
+            }
+
+            resultDiv.innerHTML = '<div class="success"><strong>✅ API Key looks valid!</strong><br><br>Now update your .env file:</div>';
+
+            const envContent = `RESEND_API_KEY=${apiKey}\nRESEND_FROM_EMAIL=onboarding@resend.dev`;
+
+            resultDiv.innerHTML += `
+                <div class="step">
+                    <h3>Copy this to your .env file:</h3>
+                    <div class="code-block" id="envCode">${envContent.replace(/\n/g, '<br>')}</div>
+                    <button class="button copy-btn" onclick="copyToClipboard()">📋 Copy to Clipboard</button>
+                </div>
+                <div class="success">
+                    <strong>Next steps:</strong><br>
+                    1. Open <code>E:\\AiChatbot\\aiAccountant\\backend\\.env</code><br>
+                    2. Paste the configuration above<br>
+                    3. Save the file<br>
+                    4. Restart backend server<br>
+                    5. Test at <a href="http://localhost:5173/forgot-password" target="_blank">http://localhost:5173/forgot-password</a>
+                </div>
+            `;
+        }
+
+        function copyToClipboard() {
+            const apiKey = document.getElementById('apiKey').value.trim();
+            const text = `RESEND_API_KEY=${apiKey}\nRESEND_FROM_EMAIL=onboarding@resend.dev`;
+
+            navigator.clipboard.writeText(text).then(() => {
+                alert('✅ Copied to clipboard! Now paste it in your .env file');
+            }).catch(err => {
+                alert('❌ Could not copy. Please copy manually.');
+            });
+        }
+    </script>
+</body>
+
+</html>

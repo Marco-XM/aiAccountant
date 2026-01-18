@@ -4,7 +4,7 @@
   .animate-fadeIn {
     animation: fadeIn 0.3s ease-in;
   }
-  
+
   @keyframes fadeIn {
     from {
       opacity: 0;
@@ -15,76 +15,219 @@
       transform: translateY(0);
     }
   }
+
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px) scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
 }
 
-:root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
-}
-
-body {
-  margin: 0;
-  min-width: 320px;
-  min-height: 100vh;
-}
-
-#root {
-  width: 100%;
-  min-height: 100vh;
-}
-
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
-}
-
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
-}
-
-@media (prefers-color-scheme: light) {
+@layer base {
   :root {
-    color: #213547;
-    background-color: #ffffff;
+    /* Palette: https://colorhunt.co/palette/222831393e4600adb5eeeeee */
+    --ui-ink: #222831;
+    --ui-ink-2: #393e46;
+    --ui-accent: #00adb5;
+    --ui-bg: #eeeeee;
+
+    --ui-surface: #ffffff;
+    --ui-surface-2: #f6f7f8;
+    --ui-border: rgba(34, 40, 49, 0.12);
+    --ui-shadow: 0 14px 40px rgba(34, 40, 49, 0.12);
+    --ui-shadow-soft: 0 10px 28px rgba(34, 40, 49, 0.08);
+
+    --ui-focus: rgba(0, 173, 181, 0.35);
+
+    --ui-nav-bg: #222831;
+    --ui-nav-surface: #393e46;
+    --ui-nav-text: #eeeeee;
+    --ui-nav-muted: rgba(238, 238, 238, 0.72);
   }
+
+  html,
+  body {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    min-width: 320px;
+    min-height: 100vh;
+    background: radial-gradient(
+        1200px 800px at 10% 0%,
+        rgba(0, 173, 181, 0.18),
+        transparent 60%
+      ),
+      radial-gradient(
+        900px 700px at 100% 10%,
+        rgba(57, 62, 70, 0.12),
+        transparent 55%
+      ),
+      var(--ui-bg);
+    color: var(--ui-ink);
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+      Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  #root {
+    width: 100%;
+    min-height: 100vh;
+  }
+
+  ::selection {
+    background: rgba(0, 173, 181, 0.25);
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
   a:hover {
-    color: #747bff;
+    color: var(--ui-ink);
   }
-  button {
-    background-color: #f9f9f9;
+}
+
+@layer components {
+  .ui-shell {
+    min-height: 100vh;
+    background: radial-gradient(
+        1200px 800px at 10% 0%,
+        rgba(0, 173, 181, 0.18),
+        transparent 60%
+      ),
+      radial-gradient(
+        900px 700px at 100% 10%,
+        rgba(57, 62, 70, 0.12),
+        transparent 55%
+      ),
+      var(--ui-bg);
+  }
+
+  .ui-card {
+    background: var(--ui-surface);
+    border: 1px solid var(--ui-border);
+    border-radius: 18px;
+    box-shadow: var(--ui-shadow-soft);
+  }
+
+  .ui-card-strong {
+    box-shadow: var(--ui-shadow);
+  }
+
+  .ui-input {
+    background: var(--ui-surface);
+    border: 1px solid var(--ui-border);
+    border-radius: 14px;
+    padding: 12px 14px;
+    width: 100%;
+    color: var(--ui-ink);
+    outline: none;
+    transition: box-shadow 160ms ease, border-color 160ms ease,
+      transform 160ms ease;
+  }
+
+  .ui-input:focus {
+    border-color: rgba(0, 173, 181, 0.55);
+    box-shadow: 0 0 0 4px var(--ui-focus);
+  }
+
+  .ui-btn {
+    background: var(--ui-accent);
+    color: var(--ui-nav-bg);
+    border-radius: 14px;
+    padding: 12px 16px;
+    font-weight: 700;
+    transition: transform 160ms ease, filter 160ms ease, box-shadow 160ms ease;
+    box-shadow: 0 10px 26px rgba(0, 173, 181, 0.22);
+  }
+
+  .ui-btn:hover {
+    filter: brightness(1.02);
+    transform: translateY(-1px);
+  }
+
+  .ui-btn:active {
+    transform: translateY(0);
+  }
+
+  .ui-btn:focus-visible {
+    outline: 3px solid var(--ui-focus);
+    outline-offset: 2px;
+  }
+
+  .ui-btn-secondary {
+    background: var(--ui-surface);
+    border: 1px solid var(--ui-border);
+    color: var(--ui-ink);
+    border-radius: 14px;
+    padding: 12px 16px;
+    font-weight: 700;
+    transition: transform 160ms ease, box-shadow 160ms ease;
+    box-shadow: 0 10px 24px rgba(34, 40, 49, 0.06);
+  }
+
+  .ui-btn-secondary:hover {
+    transform: translateY(-1px);
+  }
+
+  .ui-nav {
+    background: linear-gradient(180deg, var(--ui-nav-bg), #1b212b);
+    color: var(--ui-nav-text);
+    border-right: 1px solid rgba(238, 238, 238, 0.12);
+  }
+
+  .ui-nav-brand {
+    background: linear-gradient(
+      135deg,
+      rgba(0, 173, 181, 0.22),
+      rgba(0, 0, 0, 0)
+    );
+    border: 1px solid rgba(0, 173, 181, 0.25);
+  }
+
+  .ui-navlink {
+    color: var(--ui-nav-muted);
+    border-radius: 14px;
+    padding: 12px 14px;
+    transition: background 160ms ease, color 160ms ease, transform 160ms ease,
+      border-color 160ms ease;
+    border: 1px solid transparent;
+  }
+
+  .ui-navlink:hover {
+    background: rgba(238, 238, 238, 0.06);
+    color: var(--ui-nav-text);
+    transform: translateX(1px);
+  }
+
+  .ui-navlink-active {
+    background: rgba(0, 173, 181, 0.14);
+    color: var(--ui-nav-text);
+    border-color: rgba(0, 173, 181, 0.35);
+  }
+
+  .ui-topbar {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--ui-border);
+  }
+
+  .ui-pill {
+    background: rgba(0, 173, 181, 0.12);
+    border: 1px solid rgba(0, 173, 181, 0.25);
+    color: var(--ui-ink);
+    border-radius: 999px;
+    padding: 6px 10px;
+    font-weight: 600;
   }
 }

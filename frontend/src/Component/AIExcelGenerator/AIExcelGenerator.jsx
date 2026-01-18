@@ -1,10 +1,11 @@
-import React, { useState, useContext } from 'react';
-import { Helmet } from 'react-helmet';
-import toast from 'react-hot-toast';
-import { AuthContext } from '../../Context/AuthContext';
+import React, { useState, useContext } from "react";
+import { Helmet } from "react-helmet";
+import toast from "react-hot-toast";
+import { AuthContext } from "../../Context/AuthContext";
+import { api, API_URL } from "../../config/api";
 
 const AIExcelGenerator = () => {
-  const [prompt, setPrompt] = useState('');
+  const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
   const [generatedFile, setGeneratedFile] = useState(null);
   const { token } = useContext(AuthContext);
@@ -14,12 +15,12 @@ const AIExcelGenerator = () => {
     "Make a budget tracker with 5 columns: Date, Category, Amount, Notes, and Balance. Add formulas to calculate running balance",
     "Create a grade sheet with student names in column A, 3 test scores in columns B-D, and average in column E with conditional formatting",
     "Generate a monthly expense tracker with categories in rows and months in columns, include total row at bottom",
-    "Create an inventory sheet with item name, quantity, unit price, and total value columns. Make headers blue with white text"
+    "Create an inventory sheet with item name, quantity, unit price, and total value columns. Make headers blue with white text",
   ];
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
-      toast.error('Please enter a prompt');
+      toast.error("Please enter a prompt");
       return;
     }
 
@@ -27,26 +28,15 @@ const AIExcelGenerator = () => {
     setGeneratedFile(null);
 
     try {
-      const response = await fetch('http://localhost:5000/api/ai-excel/generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ prompt })
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
+      const response = await api.aiExcel.generate({ prompt });
+      const data = response.data;
+      if (data?.success) {
         setGeneratedFile(data);
-        toast.success('Excel file generated successfully!');
-      } else {
-        toast.error(data.error || 'Failed to generate Excel file');
+        toast.success("Excel file generated successfully!");
       }
     } catch (error) {
-      console.error('Error generating Excel:', error);
-      toast.error('Failed to generate Excel file');
+      // API interceptor handles user-facing error toast.
+      console.error("Error generating Excel:", error);
     } finally {
       setLoading(false);
     }
@@ -56,40 +46,47 @@ const AIExcelGenerator = () => {
     if (!generatedFile) return;
 
     try {
-      const response = await fetch(`http://localhost:5000${generatedFile.downloadUrl}`, {
+      const response = await fetch(`${API_URL}${generatedFile.downloadUrl}`, {
         headers: {
-          'Authorization': `Bearer ${token}`
-        }
+          Authorization: `Bearer ${token}`,
+        },
       });
 
       if (response.ok) {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
+        const a = document.createElement("a");
         a.href = url;
         a.download = generatedFile.fileName;
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
-        toast.success('File downloaded successfully!');
+        toast.success("File downloaded successfully!");
       } else {
-        toast.error('Failed to download file');
+        toast.error("Failed to download file");
       }
     } catch (error) {
-      console.error('Error downloading file:', error);
-      toast.error('Failed to download file');
+      console.error("Error downloading file:", error);
+      toast.error("Failed to download file");
     }
   };
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
-      <Helmet><title>AI Excel Generator - AI Accountant</title></Helmet>
+      <Helmet>
+        <title>AI Excel Generator - AI Accountant</title>
+      </Helmet>
 
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">AI Excel Generator</h1>
-        <p className="text-gray-600">Describe your Excel sheet in natural language and let AI create it for you</p>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          AI Excel Generator
+        </h1>
+        <p className="text-gray-600">
+          Describe your Excel sheet in natural language and let AI create it for
+          you
+        </p>
       </div>
 
       {/* Main Content Grid */}
@@ -108,11 +105,11 @@ const AIExcelGenerator = () => {
               className="w-full h-48 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-gray-900 placeholder-gray-400"
               disabled={loading}
             />
-            
+
             {/* Action Buttons */}
             <div className="flex items-center justify-between mt-4">
               <button
-                onClick={() => setPrompt('')}
+                onClick={() => setPrompt("")}
                 className="text-gray-600 hover:text-gray-800 font-medium"
                 disabled={loading}
               >
@@ -125,16 +122,41 @@ const AIExcelGenerator = () => {
               >
                 {loading ? (
                   <>
-                    <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    <svg
+                      className="animate-spin h-5 w-5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
                     </svg>
                     <span>Generating...</span>
                   </>
                 ) : (
                   <>
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+                      />
                     </svg>
                     <span>Generate Excel</span>
                   </>
@@ -149,19 +171,43 @@ const AIExcelGenerator = () => {
               <div className="flex items-start justify-between">
                 <div className="flex items-start space-x-4">
                   <div className="bg-green-500 p-3 rounded-xl">
-                    <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    <svg
+                      className="w-8 h-8 text-white"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      />
                     </svg>
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-gray-900 mb-1">Excel File Generated!</h3>
-                    <p className="text-sm text-gray-600 mb-3">{generatedFile.fileName}</p>
+                    <h3 className="text-lg font-bold text-gray-900 mb-1">
+                      Excel File Generated!
+                    </h3>
+                    <p className="text-sm text-gray-600 mb-3">
+                      {generatedFile.fileName}
+                    </p>
                     <button
                       onClick={handleDownload}
                       className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors font-medium"
                     >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                        />
                       </svg>
                       <span>Download Excel</span>
                     </button>
@@ -177,8 +223,18 @@ const AIExcelGenerator = () => {
           {/* Examples */}
           <div className="bg-white rounded-2xl shadow-lg p-6">
             <div className="flex items-center space-x-2 mb-4">
-              <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+              <svg
+                className="w-5 h-5 text-purple-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+                />
               </svg>
               <h3 className="font-bold text-gray-900">Example Prompts</h3>
             </div>
@@ -199,8 +255,18 @@ const AIExcelGenerator = () => {
           {/* Tips */}
           <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-2xl shadow-lg p-6 border border-blue-200">
             <div className="flex items-center space-x-2 mb-4">
-              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <svg
+                className="w-5 h-5 text-blue-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
               </svg>
               <h3 className="font-bold text-gray-900">Tips</h3>
             </div>
