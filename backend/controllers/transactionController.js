@@ -14,7 +14,7 @@ const normalizeTransactionType = (value) => {
   // Common synonyms from AI / human input
   if (
     ["income", "in", "revenue", "sale", "sales", "credit", "deposit"].includes(
-      raw
+      raw,
     )
   )
     return "income";
@@ -47,7 +47,7 @@ const normalizeStatus = (value) => {
 
 // Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(
-  process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY
+  process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY,
 );
 
 // Configure multer for file uploads
@@ -63,7 +63,7 @@ const storage = multer.diskStorage({
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
     cb(
       null,
-      file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname)
+      file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname),
     );
   },
 });
@@ -71,7 +71,7 @@ const storage = multer.diskStorage({
 const fileFilter = (req, file, cb) => {
   const allowedTypes = /xlsx|xls|pdf/;
   const extname = allowedTypes.test(
-    path.extname(file.originalname).toLowerCase()
+    path.extname(file.originalname).toLowerCase(),
   );
   const mimetype =
     allowedTypes.test(file.mimetype) ||
@@ -144,7 +144,7 @@ const analyzeWithAI = async (data, fileType) => {
       // Check if this looks like well-structured financial data.
       // If yes, process directly (bypass AI) but choose the correct transaction type.
       const keysLower = Object.keys(firstRow).map((k) =>
-        String(k).toLowerCase()
+        String(k).toLowerCase(),
       );
       const hasKey = (needle) =>
         keysLower.some((k) => k === needle || k.includes(needle));
@@ -174,7 +174,7 @@ const analyzeWithAI = async (data, fileType) => {
         const transactionType =
           salesSignals >= 2 && hasAmountLike ? "income" : "expense";
         console.log(
-          `Detected structured ${transactionType} data (bypassing AI), processing directly...`
+          `Detected structured ${transactionType} data (bypassing AI), processing directly...`,
         );
         return processStructuredExcelData(data, transactionType);
       }
@@ -274,13 +274,13 @@ const analyzeWithAI = async (data, fileType) => {
       const remainingRows = data.slice(50);
       const additionalTransactions = processExcelRowsBasedOnPattern(
         remainingRows,
-        aiTransactions[0]
+        aiTransactions[0],
       );
 
       aiTransactions = [...aiTransactions, ...additionalTransactions];
       console.log(
         "Total transactions after processing all rows:",
-        aiTransactions.length
+        aiTransactions.length,
       );
     }
 
@@ -298,7 +298,7 @@ const processStructuredExcelData = (data, transactionType = "expense") => {
     data.length,
     "structured Excel rows directly as",
     transactionType,
-    "..."
+    "...",
   );
   const transactions = [];
 
@@ -371,7 +371,7 @@ const processStructuredExcelData = (data, transactionType = "expense") => {
           row["Gross Amount"] ||
           row["Net Total"] ||
           row["Total Amount"] ||
-          0
+          0,
       );
 
       // If still no amount found, look for any numeric field
@@ -459,8 +459,8 @@ const processStructuredExcelData = (data, transactionType = "expense") => {
                 parsedDate = new Date(
                   `${parts[2]}-${parts[0].padStart(2, "0")}-${parts[1].padStart(
                     2,
-                    "0"
-                  )}`
+                    "0",
+                  )}`,
                 );
               }
             }
@@ -514,7 +514,7 @@ const processStructuredExcelData = (data, transactionType = "expense") => {
   });
 
   console.log(
-    `Successfully processed ${transactions.length} out of ${data.length} total rows`
+    `Successfully processed ${transactions.length} out of ${data.length} total rows`,
   );
   return transactions;
 };
@@ -600,7 +600,7 @@ const processExcelRowsBasedOnPattern = (rows, sampleTransaction) => {
   console.log(
     "Processed",
     additionalTransactions.length,
-    "additional transactions"
+    "additional transactions",
   );
   return additionalTransactions;
 };
@@ -628,7 +628,7 @@ const uploadAndAnalyzeFile = async (req, res) => {
       : "excel";
 
     console.log(
-      `📁 Processing ${fileType} file: ${req.file.originalname} for user: ${req.user._id}`
+      `📁 Processing ${fileType} file: ${req.file.originalname} for user: ${req.user._id}`,
     );
     console.log(`📍 File path: ${filePath}`);
 
@@ -637,7 +637,7 @@ const uploadAndAnalyzeFile = async (req, res) => {
       extractedData = extractDataFromExcel(filePath);
       console.log(
         "Excel data extracted successfully, rows:",
-        extractedData.length
+        extractedData.length,
       );
 
       // Check if this is a well-structured report (sales or expenses)
@@ -688,83 +688,99 @@ const uploadAndAnalyzeFile = async (req, res) => {
 
       if (hasExpenseStructure || hasSalesStructure) {
         console.log(
-          `Detected structured ${transactionType} data, processing directly...`
+          `Detected structured ${transactionType} data, processing directly...`,
         );
         const transactions = processStructuredExcelData(
           extractedData,
-          transactionType
+          transactionType,
         );
         console.log(
-          `processStructuredExcelData returned ${transactions.length} transactions`
+          `processStructuredExcelData returned ${transactions.length} transactions`,
         );
 
         if (transactions.length > 0) {
-          // Save structured transactions directly to database
-          const savedTransactions = [];
+          // Save structured transactions directly to database using bulk insert (much faster)
           const userId = req.user._id;
           console.log(
-            `Starting to save ${transactions.length} transactions for user: ${userId}`
+            `Starting to save ${transactions.length} transactions for user: ${userId}`,
           );
           console.log(`User ID type: ${typeof userId}, Value: ${userId}`);
 
-          for (let i = 0; i < transactions.length; i++) {
-            const transaction = transactions[i];
-            try {
-              if (i === 0) {
-                console.log(`Sample transaction to save:`, {
-                  date: transaction.date,
-                  amount: transaction.amount,
-                  description: transaction.description,
-                  category: transaction.category,
-                  type: transaction.type,
-                });
-              }
-
-              const newTransaction = new Transaction({
-                userId: userId,
-                date: new Date(transaction.date),
-                desc: transaction.description || "Transaction",
-                amount: Math.abs(transaction.amount),
-                category: transaction.category || "Uncategorized",
-                vendor: transaction.vendor || "",
-                type: normalizeTransactionType(transaction.type) || "expense",
-                status: "needs_review",
-                sourceFile: {
-                  filename: req.file.filename,
-                  originalName: req.file.originalname,
-                  fileType: fileType,
-                  uploadDate: new Date(),
-                },
-                aiAnalysis: {
-                  confidence: transaction.confidence || 0.95,
-                  extractedText: JSON.stringify(extractedData.slice(0, 10)), // Sample only
-                  processingNotes: "Processed directly from structured Excel",
-                },
+          // Prepare all transactions for bulk insert
+          const transactionsToInsert = transactions.map((transaction, i) => {
+            if (i === 0) {
+              console.log(`Sample transaction to save:`, {
+                date: transaction.date,
+                amount: transaction.amount,
+                description: transaction.description,
+                category: transaction.category,
+                type: transaction.type,
               });
+            }
 
-              const saved = await newTransaction.save();
-              savedTransactions.push(saved);
+            return {
+              userId: userId,
+              date: new Date(transaction.date),
+              desc: transaction.description || "Transaction",
+              amount: Math.abs(transaction.amount),
+              category: transaction.category || "Uncategorized",
+              vendor: transaction.vendor || "",
+              type: normalizeTransactionType(transaction.type) || "expense",
+              status: "needs_review",
+              sourceFile: {
+                filename: req.file.filename,
+                originalName: req.file.originalname,
+                fileType: fileType,
+                uploadDate: new Date(),
+              },
+              aiAnalysis: {
+                confidence: transaction.confidence || 0.95,
+                extractedText: JSON.stringify(extractedData.slice(0, 10)), // Sample only
+                processingNotes: "Processed directly from structured Excel",
+              },
+            };
+          });
 
-              if ((i + 1) % 100 === 0) {
-                console.log(`✅ Saved ${i + 1} transactions so far...`);
-              }
-            } catch (saveError) {
-              console.error(
-                `❌ Error saving structured transaction ${i + 1}:`,
-                saveError.message
+          // Bulk insert - much faster than individual saves
+          let savedTransactions = [];
+          try {
+            savedTransactions = await Transaction.insertMany(
+              transactionsToInsert,
+              {
+                ordered: false, // Continue on error
+              },
+            );
+            console.log(
+              `✅ Successfully bulk inserted ${savedTransactions.length} transactions`,
+            );
+          } catch (bulkError) {
+            // insertMany with ordered:false still inserts valid docs even if some fail
+            if (bulkError.insertedDocs) {
+              savedTransactions = bulkError.insertedDocs;
+              console.log(
+                `⚠️ Bulk insert completed with some errors. Saved ${savedTransactions.length} out of ${transactions.length}`,
               );
-              if (i < 3) {
-                console.error("Full error details:", saveError);
-                console.error(
-                  "Transaction data:",
-                  JSON.stringify(transaction, null, 2)
-                );
+            } else {
+              console.error(`❌ Bulk insert failed:`, bulkError.message);
+              // Fallback to individual saves
+              for (let i = 0; i < transactionsToInsert.length; i++) {
+                try {
+                  const saved = await Transaction.create(
+                    transactionsToInsert[i],
+                  );
+                  savedTransactions.push(saved);
+                } catch (saveError) {
+                  console.error(
+                    `❌ Error saving transaction ${i + 1}:`,
+                    saveError.message,
+                  );
+                }
               }
             }
           }
 
           console.log(
-            `Successfully saved ${savedTransactions.length} out of ${transactions.length} transactions`
+            `Successfully saved ${savedTransactions.length} out of ${transactions.length} transactions`,
           );
 
           // Clean up uploaded file
@@ -810,45 +826,71 @@ const uploadAndAnalyzeFile = async (req, res) => {
     const aiAnalysis = await analyzeWithAI(extractedData, fileType);
     console.log(
       "AI analysis completed, found transactions:",
-      aiAnalysis.length
+      aiAnalysis.length,
     );
 
-    // Save transactions to database
-    const savedTransactions = [];
+    // Save transactions to database using bulk insert (faster)
     const userId = req.user._id; // Get user ID from authenticated user
 
-    for (const transaction of aiAnalysis) {
-      try {
-        const newTransaction = new Transaction({
-          userId: userId,
-          date: new Date(transaction.date),
-          desc: transaction.description,
-          amount: Math.abs(transaction.amount),
-          category: transaction.category || "Uncategorized",
-          vendor: transaction.vendor,
-          type: normalizeTransactionType(transaction.type) || "expense",
-          sourceFile: {
-            filename: req.file.filename,
-            originalName: req.file.originalname,
-            fileType: fileType,
-            uploadDate: new Date(),
-          },
-          aiAnalysis: {
-            confidence: transaction.confidence || 0.8,
-            extractedText:
-              fileType === "pdf"
-                ? extractedData
-                : JSON.stringify(extractedData),
-            suggestedCategory: transaction.category,
-            processingNotes: "Processed with Gemini AI",
-          },
-          status: "needs_review",
-        });
+    const transactionsToInsert = aiAnalysis.map((transaction) => ({
+      userId: userId,
+      date: new Date(transaction.date),
+      desc: transaction.description,
+      amount: Math.abs(transaction.amount),
+      category: transaction.category || "Uncategorized",
+      vendor: transaction.vendor,
+      type: normalizeTransactionType(transaction.type) || "expense",
+      sourceFile: {
+        filename: req.file.filename,
+        originalName: req.file.originalname,
+        fileType: fileType,
+        uploadDate: new Date(),
+      },
+      aiAnalysis: {
+        confidence: transaction.confidence || 0.8,
+        extractedText:
+          fileType === "pdf"
+            ? extractedData.substring(0, 1000) // Limit text size
+            : JSON.stringify(extractedData.slice(0, 10)), // Sample only
+        suggestedCategory: transaction.category,
+        processingNotes: "Processed with Gemini AI",
+      },
+      status: "needs_review",
+    }));
 
-        const saved = await newTransaction.save();
-        savedTransactions.push(saved);
-      } catch (saveError) {
-        console.error("Error saving individual transaction:", saveError);
+    // Bulk insert for better performance
+    let savedTransactions = [];
+    try {
+      savedTransactions = await Transaction.insertMany(transactionsToInsert, {
+        ordered: false, // Continue even if some fail
+      });
+      console.log(
+        `✅ Successfully bulk inserted ${savedTransactions.length} AI-analyzed transactions`,
+      );
+    } catch (bulkError) {
+      // insertMany with ordered:false still inserts valid docs
+      if (bulkError.insertedDocs) {
+        savedTransactions = bulkError.insertedDocs;
+        console.log(
+          `⚠️ Bulk insert completed with some errors. Saved ${savedTransactions.length} out of ${aiAnalysis.length}`,
+        );
+      } else {
+        console.error(
+          "Bulk insert failed, trying individual saves:",
+          bulkError.message,
+        );
+        // Fallback to individual saves
+        for (const transactionData of transactionsToInsert) {
+          try {
+            const saved = await Transaction.create(transactionData);
+            savedTransactions.push(saved);
+          } catch (saveError) {
+            console.error(
+              "Error saving individual transaction:",
+              saveError.message,
+            );
+          }
+        }
       }
     }
 
@@ -946,7 +988,7 @@ const createTransaction = async (req, res) => {
       "✅ Transaction saved with ID:",
       saved._id,
       "Type:",
-      saved.type
+      saved.type,
     );
     return res.status(201).json(saved);
   } catch (error) {
@@ -992,7 +1034,7 @@ const getTransactions = async (req, res) => {
       "with filter:",
       JSON.stringify(filter),
       "limit:",
-      limitNum
+      limitNum,
     );
 
     const transactions = await Transaction.find(filter)
@@ -1005,10 +1047,10 @@ const getTransactions = async (req, res) => {
     // Debug: Check if there are ANY transactions in the database
     const allTransactionsCount = await Transaction.countDocuments({});
     console.log(
-      `📊 Database stats: ${allTransactionsCount} total transactions in DB, ${total} for current user`
+      `📊 Database stats: ${allTransactionsCount} total transactions in DB, ${total} for current user`,
     );
     console.log(
-      `Found ${transactions.length} transactions out of ${total} total for user ${userId}`
+      `Found ${transactions.length} transactions out of ${total} total for user ${userId}`,
     );
 
     // Debug: log transaction types in results
@@ -1086,7 +1128,7 @@ const updateTransaction = async (req, res) => {
     const transaction = await Transaction.findOneAndUpdate(
       { _id: id, userId },
       { $set: updates },
-      { new: true, runValidators: true }
+      { new: true, runValidators: true },
     );
 
     if (!transaction) {
@@ -1159,13 +1201,33 @@ const deleteAllTransactions = async (req, res) => {
 
     const userId = req.user._id;
 
-    console.log("Attempting to delete all transactions for user:", userId);
+    // First, count how many transactions exist
+    const countBefore = await Transaction.countDocuments({ userId: userId });
+    console.log(
+      `Found ${countBefore} transactions to delete for user:`,
+      userId,
+    );
+
+    // Delete all transactions for this user
     const result = await Transaction.deleteMany({ userId: userId });
 
-    console.log("Deleted", result.deletedCount, "transactions");
+    // Verify deletion
+    const countAfter = await Transaction.countDocuments({ userId: userId });
+    console.log(`Deleted ${result.deletedCount} transactions`);
+    console.log(`Remaining transactions: ${countAfter}`);
+
+    if (countAfter > 0) {
+      console.warn(
+        `⚠️ Warning: ${countAfter} transactions still remain after deletion!`,
+      );
+    } else {
+      console.log("✅ All transactions successfully deleted");
+    }
+
     res.json({
       message: `All ${result.deletedCount} transaction(s) deleted successfully`,
       deletedCount: result.deletedCount,
+      remainingCount: countAfter,
     });
   } catch (error) {
     console.error("Error deleting all transactions:", error);

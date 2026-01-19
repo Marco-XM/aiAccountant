@@ -2,7 +2,7 @@ import React, { useState, useContext } from "react";
 import { Helmet } from "react-helmet";
 import toast from "react-hot-toast";
 import { AuthContext } from "../../Context/AuthContext";
-import { api, API_URL } from "../../config/api";
+import { api, API_ORIGIN } from "../../config/api";
 
 const AIExcelGenerator = () => {
   const [prompt, setPrompt] = useState("");
@@ -46,11 +46,14 @@ const AIExcelGenerator = () => {
     if (!generatedFile) return;
 
     try {
-      const response = await fetch(`${API_URL}${generatedFile.downloadUrl}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
+      const response = await fetch(
+        `${API_ORIGIN}${generatedFile.downloadUrl}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         },
-      });
+      );
 
       if (response.ok) {
         const blob = await response.blob();

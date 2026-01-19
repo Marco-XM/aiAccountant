@@ -6,6 +6,7 @@ const {
   resetPassword,
 } = require("../controllers/authController");
 const validate = require("../middleware/validate.mw");
+const { authLimiter } = require("../middleware/rateLimit.mw");
 const {
   registerValidation,
   loginValidation,
@@ -15,21 +16,23 @@ const {
 
 const router = express.Router();
 
-router.post("/register", registerValidation, validate, register);
-router.post("/login", loginValidation, validate, login);
+router.post("/register", authLimiter, registerValidation, validate, register);
+router.post("/login", authLimiter, loginValidation, validate, login);
 
 // Password reset
 router.post(
   "/forgot-password",
+  authLimiter,
   forgotPasswordValidation,
   validate,
-  forgotPassword
+  forgotPassword,
 );
 router.post(
   "/reset-password",
+  authLimiter,
   resetPasswordValidation,
   validate,
-  resetPassword
+  resetPassword,
 );
 
 module.exports = router;

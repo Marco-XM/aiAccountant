@@ -3,6 +3,8 @@ const path = require("path");
 require("dotenv").config({ path: path.join(__dirname, ".env") });
 const mongoose = require("mongoose");
 const cors = require("cors");
+const helmet = require("helmet");
+const { apiLimiter } = require("./middleware/rateLimit.mw");
 
 /* Import Routes */
 const authRoutes = require("./routes/authRoutes");
@@ -16,6 +18,9 @@ const chartRoutes = require("./routes/chartRoutes");
 
 const app = express();
 const PORT = process.env.PORT || process.env.HTTP_PORT || 5000;
+
+// Behind proxies (Render/Heroku/Nginx), req.ip needs trust proxy for rate limiting.
+app.set("trust proxy", 1);
 
 // Database connection with error handling
 mongoose
@@ -65,10 +70,35 @@ app.use(
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     credentials: true,
     optionsSuccessStatus: 200,
-  })
+  }),
 );
 
-app.use(express.json());
+app.use(helmet());
+app.use(express.json({ limit: "1mb" }));
+
+// Apply rate limiting selectively
+app.use("/api", (req, res, next) => {
+  // Disable rate limiting in development
+  if (!isProduction) {
+    console.log(
+      `🔓 Rate limiting disabled (dev mode): ${req.method} ${req.path}`,
+    );
+    return next();
+  }
+
+  // Skip rate limiting for these operations in production
+  const skipPaths = [
+    "/api/transactions/upload",
+    "/api/transactions/bulk",
+    "/api/transactions/all",
+  ];
+
+  if (skipPaths.some((path) => req.path === path)) {
+    return next();
+  }
+
+  apiLimiter(req, res, next);
+});
 
 // Use Routes
 app.use("/api/auth", authRoutes);
@@ -84,8 +114,12 @@ app.get("/", (req, res) => {
   res.send("Backend is Working Correctly");
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
+
+// Increase server timeout to 5 minutes for large file uploads with AI processing
+server.timeout = 300000; // 5 minutes
+server.keepAliveTimeout = 310000; // Slightly longer than timeout
 
 module.exports = app;

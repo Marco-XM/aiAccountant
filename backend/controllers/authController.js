@@ -8,6 +8,8 @@ const {
   isSmtpConfigured,
 } = require("../services/emailService");
 
+const isDev = process.env.NODE_ENV !== "production";
+
 // Ensure JWT_SECRET is set
 if (!process.env.JWT_SECRET) {
   console.error("FATAL ERROR: JWT_SECRET is not defined.");
@@ -39,7 +41,7 @@ const register = async (req, res) => {
     const token = jwt.sign(
       { _id: newUser._id, email: newUser.email },
       JWT_SECRET,
-      { expiresIn: JWT_CONFIG.EXPIRES_IN }
+      { expiresIn: JWT_CONFIG.EXPIRES_IN },
     );
 
     res.status(201).json({
@@ -103,23 +105,28 @@ const forgotPassword = async (req, res) => {
         .digest("hex");
 
       const ttlMinutes = Number(
-        process.env.RESET_PASSWORD_TOKEN_TTL_MINUTES || 60
+        process.env.RESET_PASSWORD_TOKEN_TTL_MINUTES || 60,
       );
       const expiresAt = new Date(Date.now() + ttlMinutes * 60 * 1000);
 
-      console.log("\n🔐 [Token Generation Debug]");
-      console.log("Plain token:", resetToken);
-      console.log("Token length:", resetToken.length);
-      console.log("Token hash (saved to DB):", resetTokenHash);
-      console.log("Expiry time:", expiresAt);
-      console.log("TTL minutes:", ttlMinutes);
+      if (isDev) {
+        console.log(
+          "[forgotPassword] Reset token generated for user:",
+          user.email,
+        );
+        console.log("[forgotPassword] Expires at:", expiresAt);
+      }
 
       user.resetPasswordTokenHash = resetTokenHash;
       user.resetPasswordExpiresAt = expiresAt;
       await user.save();
 
-      console.log("✅ Token saved to database successfully");
-      console.log("User email:", user.email);
+      if (isDev) {
+        console.log(
+          "[forgotPassword] Reset token hash saved for user:",
+          user.email,
+        );
+      }
 
       // This will throw an error if email sending fails
       const result = await sendPasswordResetEmail({
@@ -132,11 +139,15 @@ const forgotPassword = async (req, res) => {
         throw new Error("Email delivery failed");
       }
 
-      console.log(`✅ Password reset email sent to: ${user.email}`);
+      if (isDev) {
+        console.log(
+          `[forgotPassword] Password reset email sent to: ${user.email}`,
+        );
+      }
     } else {
       // Don't reveal that user doesn't exist - still return success
       console.log(
-        `⚠️  Password reset requested for non-existent email: ${email}`
+        `⚠️  Password reset requested for non-existent email: ${email}`,
       );
     }
 
@@ -167,18 +178,18 @@ const resetPassword = async (req, res) => {
   const { token, password } = req.body;
 
   try {
-    console.log("\n🔍 [Reset Password Debug]");
-    console.log("Received token:", token);
-    console.log("Token type:", typeof token);
-    console.log("Token length:", token?.length);
+    if (isDev) {
+      console.log("[resetPassword] Attempting password reset");
+    }
 
     const tokenHash = crypto
       .createHash("sha256")
       .update(String(token))
       .digest("hex");
 
-    console.log("Computed token hash:", tokenHash);
-    console.log("Current time:", new Date());
+    if (isDev) {
+      console.log("[resetPassword] Token hash computed");
+    }
 
     const user = await User.findOne({
       resetPasswordTokenHash: tokenHash,
@@ -186,7 +197,11 @@ const resetPassword = async (req, res) => {
     });
 
     if (!user) {
-      console.log("❌ User not found with matching token hash");
+      if (isDev) {
+        console.log(
+          "[resetPassword] No user found for token (invalid/expired)",
+        );
+      }
 
       // Debug: Check if token exists but is expired
       const expiredUser = await User.findOne({
@@ -194,11 +209,13 @@ const resetPassword = async (req, res) => {
       });
 
       if (expiredUser) {
-        console.log("⚠️  Token found but expired!");
-        console.log("Token expiry:", expiredUser.resetPasswordExpiresAt);
-        console.log("Current time:", new Date());
+        if (isDev) {
+          console.log("[resetPassword] Token found but expired");
+        }
       } else {
-        console.log("⚠️  No token match found in database");
+        if (isDev) {
+          console.log("[resetPassword] No token match found in database");
+        }
       }
 
       return res.status(400).json({
@@ -207,7 +224,9 @@ const resetPassword = async (req, res) => {
       });
     }
 
-    console.log("✅ User found, proceeding with password reset");
+    if (isDev) {
+      console.log("[resetPassword] User found, resetting password");
+    }
 
     const hashedPassword = await bcrypt.hash(password, 10);
     user.password = hashedPassword;

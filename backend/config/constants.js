@@ -59,9 +59,9 @@ const JWT_CONFIG = {
 // Rate Limiting
 const RATE_LIMIT = {
   WINDOW_MS: 15 * 60 * 1000, // 15 minutes
-  MAX_REQUESTS: 100,
-  MAX_LOGIN_ATTEMPTS: 5,
-  LOGIN_WINDOW_MS: 15 * 60 * 1000,
+  MAX_REQUESTS: 2000, // Very high limit (2000 requests per 15 min = ~2 per second sustained)
+  MAX_LOGIN_ATTEMPTS: 10, // Increased from 5 to 10
+  LOGIN_WINDOW_MS: 15 * 60 * 1000, // 15 minutes
 };
 
 module.exports = {

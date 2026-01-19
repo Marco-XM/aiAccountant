@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useRef } from "react";
 import toast from "react-hot-toast";
 import { AuthContext } from "../../Context/AuthContext";
 import { api } from "../../config/api";
@@ -29,6 +29,13 @@ const Transactions = () => {
 
   const { token } = useContext(AuthContext);
 
+  // Debounce timer ref to prevent rapid successive API calls
+  const loadDebounceTimer = useRef(null);
+
+  // Ref to track if initial load has completed (prevent duplicate useEffect calls)
+  const initialLoadComplete = useRef(false);
+  const isLoadingRef = useRef(false);
+
   // Calculate stats from transactions data
   const calculateStats = (transactionsData) => {
     const stats = {
@@ -58,15 +65,32 @@ const Transactions = () => {
 
   // Load transactions on component mount
   useEffect(() => {
-    setCurrentPage(1); // Reset to page 1 when filters change
-    loadTransactions();
+    if (!initialLoadComplete.current) {
+      // First load - both effects will try to run
+      initialLoadComplete.current = true;
+      loadTransactions();
+    } else {
+      // Filter changed - reset to page 1 and reload
+      setCurrentPage(1);
+      // loadTransactions will be called by the currentPage effect
+    }
   }, [filter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    loadTransactions();
+    if (initialLoadComplete.current) {
+      // Only run if not the initial mount (handled by filter effect)
+      loadTransactions();
+    }
   }, [currentPage]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadTransactions = async () => {
+    // Prevent duplicate simultaneous calls
+    if (isLoadingRef.current) {
+      console.log("⏭️ Skipping duplicate load call");
+      return;
+    }
+
+    isLoadingRef.current = true;
     setIsLoading(true);
     setLoadError(null);
     try {
@@ -105,7 +129,7 @@ const Transactions = () => {
 
       if (transactionsData.length === 0 && currentPage === 1) {
         console.log(
-          "No transactions found. Upload a file to create transactions."
+          "No transactions found. Upload a file to create transactions.",
         );
       }
 
@@ -116,7 +140,7 @@ const Transactions = () => {
       // Keep this page from showing a misleading generic toast.
       console.error(
         "Error loading transactions:",
-        error?.response?.data || error?.message
+        error?.response?.data || error?.message,
       );
       const message =
         error?.response?.data?.message ||
@@ -127,6 +151,7 @@ const Transactions = () => {
       setLoadError(message);
     } finally {
       setIsLoading(false);
+      isLoadingRef.current = false;
     }
   };
 
@@ -137,9 +162,19 @@ const Transactions = () => {
     } catch (error) {
       console.error(
         "Error fetching stats:",
-        error?.response?.data || error?.message
+        error?.response?.data || error?.message,
       );
     }
+  };
+
+  // Debounced reload to prevent hitting rate limits
+  const debouncedReload = (delay = 300) => {
+    if (loadDebounceTimer.current) {
+      clearTimeout(loadDebounceTimer.current);
+    }
+    loadDebounceTimer.current = setTimeout(() => {
+      loadTransactions();
+    }, delay);
   };
 
   const handleFileSelect = (event) => {
@@ -179,8 +214,17 @@ const Transactions = () => {
     const formData = new FormData();
     formData.append("file", selectedFile);
 
+    // Show processing toast with longer duration
+    const processingToast = toast.loading(
+      "Processing file with AI... This may take up to 2 minutes for large files.",
+      { duration: Infinity },
+    );
+
     try {
       const response = await api.transactions.upload(formData);
+
+      // Dismiss loading toast
+      toast.dismiss(processingToast);
 
       const responseData = response.data.data || response.data;
       const transactionsFound =
@@ -192,20 +236,20 @@ const Transactions = () => {
         0;
 
       console.log(
-        `📊 Results: Found ${transactionsFound}, Saved ${transactionsSaved}`
+        `📊 Results: Found ${transactionsFound}, Saved ${transactionsSaved}`,
       );
 
       toast.success(
-        `File processed! Found ${transactionsFound} transactions, saved ${transactionsSaved}`
+        `File processed! Found ${transactionsFound} transactions, saved ${transactionsSaved}`,
       );
       setSelectedFile(null);
       document.getElementById("fileInput").value = "";
 
       // Reload transactions after a short delay to ensure database is updated
-      setTimeout(() => {
-        loadTransactions();
-      }, 500);
+      debouncedReload(500);
     } catch (error) {
+      // Dismiss loading toast
+      toast.dismiss(processingToast);
       console.error("Upload failed:", error?.response?.data || error?.message);
       // Central API client already toasted with server-provided message when possible.
     } finally {
@@ -218,11 +262,11 @@ const Transactions = () => {
       await api.transactions.update(id, updates);
       toast.success("Transaction updated successfully");
       setEditingTransaction(null);
-      loadTransactions();
+      debouncedReload();
     } catch (error) {
       console.error(
         "Error updating transaction:",
-        error?.response?.data || error?.message
+        error?.response?.data || error?.message,
       );
     }
   };
@@ -239,11 +283,18 @@ const Transactions = () => {
       await api.transactions.delete(id);
       toast.success("Transaction deleted successfully");
       setSelectedTransactions([]);
-      loadTransactions();
+
+      // If only one item left on page and not on page 1, go back
+      if (transactions.length === 1 && currentPage > 1) {
+        setCurrentPage(currentPage - 1);
+      } else {
+        // Otherwise reload current page
+        loadTransactions();
+      }
     } catch (error) {
       console.error(
         "Error deleting transaction:",
-        error?.response?.data || error?.message
+        error?.response?.data || error?.message,
       );
       toast.error("Failed to delete transaction");
     }
@@ -252,7 +303,7 @@ const Transactions = () => {
   // Toggle selection for a single transaction
   const handleToggleSelect = (id) => {
     setSelectedTransactions((prev) =>
-      prev.includes(id) ? prev.filter((tid) => tid !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((tid) => tid !== id) : [...prev, id],
     );
   };
 
@@ -283,14 +334,22 @@ const Transactions = () => {
       toast.success(
         `${ids.length} transaction${
           ids.length > 1 ? "s" : ""
-        } deleted successfully`
+        } deleted successfully`,
       );
       setSelectedTransactions([]);
-      loadTransactions();
+
+      // If we deleted all items on current page and not on page 1, go back one page
+      const remainingOnPage = transactions.length - ids.length;
+      if (remainingOnPage === 0 && currentPage > 1) {
+        setCurrentPage(currentPage - 1);
+      } else {
+        // Otherwise reload current page
+        loadTransactions();
+      }
     } catch (error) {
       console.error(
         "Error bulk deleting transactions:",
-        error?.response?.data || error?.message
+        error?.response?.data || error?.message,
       );
       toast.error("Failed to delete transactions");
     }
@@ -308,19 +367,31 @@ const Transactions = () => {
   const confirmDeleteAll = async () => {
     setDeleteModal({ show: false, type: null, data: null });
 
+    // Immediately clear all state to prevent UI inconsistency
+    setTransactions([]);
+    setSelectedTransactions([]);
+    setTotalPages(1);
+    setTotalTransactions(0);
+    setCurrentPage(1);
+    setStats(null);
+
     try {
       const response = await api.transactions.deleteAll();
       toast.success(
-        response.data.message || "All transactions deleted successfully"
+        response.data.message || "All transactions deleted successfully",
       );
-      setSelectedTransactions([]);
+
+      // Force immediate reload to confirm deletion (no debounce)
       loadTransactions();
     } catch (error) {
       console.error(
         "Error deleting all transactions:",
-        error?.response?.data || error?.message
+        error?.response?.data || error?.message,
       );
       toast.error("Failed to delete all transactions");
+
+      // If deletion failed, reload to show actual state
+      loadTransactions();
     }
   };
 
@@ -976,7 +1047,7 @@ const Transactions = () => {
                           <input
                             type="checkbox"
                             checked={selectedTransactions.includes(
-                              transaction._id
+                              transaction._id,
                             )}
                             onChange={() => handleToggleSelect(transaction._id)}
                             className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
@@ -993,7 +1064,7 @@ const Transactions = () => {
                         </td>
                         <td
                           className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${getTypeColor(
-                            transaction.type
+                            transaction.type,
                           )}`}
                         >
                           {transaction.type === "income" ? "+" : "-"}
@@ -1005,7 +1076,7 @@ const Transactions = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
                           <span
                             className={`capitalize ${getTypeColor(
-                              transaction.type
+                              transaction.type,
                             )}`}
                           >
                             {transaction.type}
@@ -1014,7 +1085,7 @@ const Transactions = () => {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span
                             className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(
-                              transaction.status
+                              transaction.status,
                             )}`}
                           >
                             {transaction.status.replace("_", " ")}
@@ -1051,7 +1122,7 @@ const Transactions = () => {
                         <input
                           type="checkbox"
                           checked={selectedTransactions.includes(
-                            transaction._id
+                            transaction._id,
                           )}
                           onChange={() => handleToggleSelect(transaction._id)}
                           className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
@@ -1074,7 +1145,7 @@ const Transactions = () => {
                             </span>
                             <span
                               className={`text-xs px-2 py-1 rounded-full ${getStatusColor(
-                                transaction.status
+                                transaction.status,
                               )}`}
                             >
                               {transaction.status.replace("_", " ")}
@@ -1086,7 +1157,7 @@ const Transactions = () => {
                     <div className="flex justify-between items-center">
                       <span
                         className={`text-lg font-semibold ${getTypeColor(
-                          transaction.type
+                          transaction.type,
                         )}`}
                       >
                         {transaction.type === "income" ? "+" : "-"}

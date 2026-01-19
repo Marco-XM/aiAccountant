@@ -1,15 +1,26 @@
 import axios from "axios";
 import toast from "react-hot-toast";
 
-// Get API URL from environment variables
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const normalizeOrigin = (value) => {
+  if (!value) return value;
+  return String(value).replace(/\/$/, "");
+};
+
+// Prefer explicit origin + base URL; keep backwards compatibility with older env var names.
+const API_ORIGIN = normalizeOrigin(
+  import.meta.env.VITE_API_ORIGIN ||
+    import.meta.env.VITE_API_URL ||
+    "http://localhost:5000",
+);
+
+const API_BASE_URL = normalizeOrigin(
+  import.meta.env.VITE_API_BASE_URL || `${API_ORIGIN}/api`,
+);
 
 // Create axios instance
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000,
+  timeout: 180000, // 3 minutes - increased for file uploads with AI processing
   headers: {
     "Content-Type": "application/json",
   },
@@ -26,7 +37,7 @@ apiClient.interceptors.request.use(
   },
   (error) => {
     return Promise.reject(error);
-  }
+  },
 );
 
 // Response interceptor for error handling
@@ -72,7 +83,7 @@ apiClient.interceptors.response.use(
       toast.error("An unexpected error occurred.");
     }
     return Promise.reject(error);
-  }
+  },
 );
 
 // API endpoints
@@ -129,9 +140,9 @@ export const api = {
   // Excel Generator
   excel: {
     downloadExpenses: (count) =>
-      `${API_URL}/api/excel/expenses/download?count=${count}`,
+      `${API_ORIGIN}/api/excel/expenses/download?count=${count}`,
     downloadSales: (count) =>
-      `${API_URL}/api/excel/sales/download?count=${count}`,
+      `${API_ORIGIN}/api/excel/sales/download?count=${count}`,
     getExpenseStats: (count) =>
       apiClient.get(`/excel/expenses/stats?count=${count}`),
     getSalesStats: (count) =>
@@ -139,5 +150,6 @@ export const api = {
   },
 };
 
-export { API_BASE_URL, API_URL };
+export { API_BASE_URL, API_ORIGIN };
+export const API_URL = API_ORIGIN; // Backwards compatibility alias
 export default apiClient;
