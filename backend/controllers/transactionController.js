@@ -1,17 +1,20 @@
-const Transaction = require("../models/Transaction");
+const crypto = require("crypto");
+const { EventEmitter } = require("events");
+const path = require("path");
+const fs = require("fs");
+const multer = require("multer");
+const mongoose = require("mongoose");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const XLSX = require("xlsx");
 const pdfParse = require("pdf-parse");
-const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
-const mongoose = require("mongoose");
+const Transaction = require("../models/Transaction");
+const localTransactionStore = require("../services/localTransactionStore");
+const { isMongoObjectId } = require("../services/userIdentity");
 
 const normalizeTransactionType = (value) => {
   if (value === undefined || value === null) return undefined;
   const raw = String(value).trim().toLowerCase();
 
-  // Common synonyms from AI / human input
   if (
     ["income", "in", "revenue", "sale", "sales", "credit", "deposit"].includes(
       raw,
@@ -39,18 +42,16 @@ const normalizeTransactionType = (value) => {
 const normalizeStatus = (value) => {
   if (value === undefined || value === null) return undefined;
   const raw = String(value).trim().toLowerCase();
-  if (["pending", "approved", "rejected", "needs_review"].includes(raw))
+  if (["pending", "approved", "rejected", "needs_review", "reconciled", "flagged"].includes(raw))
     return raw;
   if (raw === "needs review") return "needs_review";
   return undefined;
 };
 
-// Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(
   process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY,
 );
 
-// Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const uploadDir = path.join(__dirname, "../uploads");
@@ -69,7 +70,7 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = /xlsx|xls|pdf/;
+  const allowedTypes = /xlsx|xls|csv|pdf/;
   const extname = allowedTypes.test(
     path.extname(file.originalname).toLowerCase(),
   );
@@ -78,20 +79,379 @@ const fileFilter = (req, file, cb) => {
     file.mimetype ===
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
     file.mimetype === "application/vnd.ms-excel" ||
+    file.mimetype === "application/csv" ||
+    file.mimetype === "text/csv" ||
     file.mimetype === "application/pdf";
 
   if (mimetype && extname) {
     return cb(null, true);
-  } else {
-    cb(new Error("Only Excel (.xlsx, .xls) and PDF files are allowed"));
   }
+
+  cb(new Error("Only Excel (.xlsx, .xls), CSV, and PDF files are allowed"));
 };
 
 const upload = multer({
-  storage: storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
-  fileFilter: fileFilter,
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter,
 });
+
+const nowIso = () => new Date().toISOString();
+const buildDuplicateHash = ({ userId, date, desc, amount, vendor }) => {
+  const dateKey = date ? new Date(date).toISOString().slice(0, 10) : "";
+  const textKey = String(desc || vendor || "").toLowerCase().replace(/\s+/g, " ").trim();
+  const amountKey = Number(amount || 0).toFixed(2);
+  return crypto
+    .createHash("sha1")
+    .update([String(userId), dateKey, textKey, amountKey].join("|"))
+    .digest("hex");
+};
+const importJobs = new Map();
+const importJobEvents = new EventEmitter();
+const IMPORT_JOB_TTL_MS = 1000 * 60 * 60;
+
+const isDatabaseReady = () => mongoose.connection.readyState === 1;
+const useLocalTransactionStore = (userId) => !isDatabaseReady() || !isMongoObjectId(userId);
+
+const serializeTransactionDocument = (document) => {
+  if (!document) return document;
+  if (typeof document.toObject === "function") {
+    return document.toObject();
+  }
+  return document;
+};
+
+const saveTransactionsBatch = async (transactions, userId, meta = {}) => {
+  if (!Array.isArray(transactions) || transactions.length === 0) {
+    return [];
+  }
+
+  if (useLocalTransactionStore(userId)) {
+    return localTransactionStore.createTransactions(transactions, { userId, meta });
+  }
+
+  try {
+    const inserted = await Transaction.insertMany(transactions, { ordered: false });
+    return inserted.map(serializeTransactionDocument);
+  } catch (bulkError) {
+    if (bulkError.insertedDocs) {
+      return bulkError.insertedDocs.map(serializeTransactionDocument);
+    }
+
+    console.warn("[Transactions] falling back to local store after batch insert failure", {
+      message: bulkError.message,
+    });
+    return localTransactionStore.createTransactions(transactions, { userId, meta });
+  }
+};
+
+const getImportJobKey = (userId, jobId) => `${String(userId)}:${String(jobId)}`;
+
+const serializeImportJob = (job) => ({
+  id: job.id,
+  userId: job.userId,
+  status: job.status,
+  degradedMode: Boolean(job.degradedMode),
+  fileName: job.fileName,
+  fileType: job.fileType,
+  fileSize: job.fileSize,
+  totalChunks: job.totalChunks,
+  totalRows: job.totalRows,
+  createdCount: job.createdCount,
+  skippedRows: job.skippedRows,
+  completedRows: job.completedRows,
+  progress: job.progress,
+  queueSize: job.queue.length,
+  failedChunks: job.failedChunks,
+  errors: job.errors,
+  cancelRequested: job.cancelRequested,
+  finalizeRequested: job.finalizeRequested,
+  isProcessing: job.isProcessing,
+  createdAt: job.createdAt,
+  updatedAt: job.updatedAt,
+  completedAt: job.completedAt,
+});
+
+const emitImportJobUpdate = (job) => {
+  job.updatedAt = nowIso();
+  const key = getImportJobKey(job.userId, job.id);
+  importJobEvents.emit(key, serializeImportJob(job));
+};
+
+const buildTransactionFromChunkRow = (row, userId, job) => {
+  if (!row || typeof row !== "object") return null;
+
+  const entries = Object.entries(row);
+  const getValue = (names) => {
+    const lowered = names.map((name) => String(name).toLowerCase());
+    for (const [key, value] of entries) {
+      const normalized = String(key).toLowerCase();
+      if (lowered.includes(normalized)) return value;
+    }
+    for (const [key, value] of entries) {
+      const normalized = String(key).toLowerCase();
+      if (lowered.some((name) => normalized.includes(name))) return value;
+    }
+    return undefined;
+  };
+
+  const description = String(
+    getValue(["description", "desc", "details", "narration", "memo"]) ??
+      getValue(["raw"] ) ??
+      "",
+  ).trim();
+  const amountRaw = getValue(["amount", "debit", "credit", "total", "value"]);
+  const amount = Number(String(amountRaw ?? "").replace(/[^0-9.-]/g, ""));
+  const dateRaw = getValue(["date", "transaction date", "posted date", "created at"]);
+  const date = dateRaw ? new Date(dateRaw) : null;
+
+  if (!description && !Number.isFinite(amount)) return null;
+
+  const transactionType =
+    normalizeTransactionType(getValue(["type"])) ||
+    (amountRaw !== undefined && String(amountRaw).trim().startsWith("-")
+      ? "expense"
+      : "expense");
+
+  const normalizedDate = date && !Number.isNaN(date.getTime()) ? date : new Date();
+  const normalizedAmount = Number.isFinite(amount) ? Math.abs(amount) : 0;
+  const normalizedDesc = description || String(getValue(["vendor", "name", "title"]) || "Imported transaction");
+  const normalizedVendor = String(getValue(["vendor", "merchant"]) || "");
+  const normalizedCategory = String(getValue(["category"]) || "Uncategorized");
+  const normalizedStatus = normalizeStatus(getValue(["status"])) || "pending";
+
+  return {
+    user: userId,
+    userId,
+    date: normalizedDate,
+    desc: normalizedDesc,
+    amount: normalizedAmount,
+    category: normalizedCategory,
+    type: transactionType,
+    status: normalizedStatus,
+    vendor: normalizedVendor,
+    currency: String(getValue(["currency"]) || "USD"),
+    notes: String(getValue(["notes"]) || ""),
+    reference: String(getValue(["reference", "ref", "id"]) || ""),
+    account: String(getValue(["account"]) || ""),
+    paymentMethod: String(getValue(["payment method", "paymentmethod", "method"]) || ""),
+    source: job?.fileName || "import-job",
+    importJobId: job?.id,
+    importSheet: row.__sheetName ? String(row.__sheetName) : "",
+    importRow: Number(row.__rowIndex) || undefined,
+    rawData: row,
+    tags: [
+      normalizedCategory === "Uncategorized" ? "needs-mapping" : "",
+      normalizedStatus === "pending" ? "new-import" : "",
+    ].filter(Boolean),
+    duplicateHash: buildDuplicateHash({
+      userId,
+      date: normalizedDate,
+      desc: normalizedDesc,
+      amount: normalizedAmount,
+      vendor: normalizedVendor,
+    }),
+  };
+};
+
+const markFailedChunk = (job, chunkIndex, rows, reason) => {
+  const existingIndex = job.failedChunks.findIndex(
+    (item) => item.chunkIndex === chunkIndex,
+  );
+
+  const entry = {
+    chunkIndex,
+    reason,
+    rowCount: rows.length,
+    updatedAt: nowIso(),
+  };
+
+  if (existingIndex >= 0) {
+    job.failedChunks[existingIndex] = entry;
+  } else {
+    job.failedChunks.push(entry);
+  }
+
+  if (job.failedChunks.length > 20) {
+    const oldestKey = job.failedChunks[0]?.chunkIndex;
+    if (oldestKey !== undefined) job.failedChunkData.delete(oldestKey);
+  }
+  job.failedChunkData.set(chunkIndex, rows);
+};
+
+const clearFailedChunk = (job, chunkIndex) => {
+  job.failedChunks = job.failedChunks.filter(
+    (item) => item.chunkIndex !== chunkIndex,
+  );
+  job.failedChunkData.delete(chunkIndex);
+};
+
+const updateImportJobProgress = (job) => {
+  if (!job.totalChunks || job.totalChunks <= 0) {
+    job.progress = 0;
+    return;
+  }
+
+  const completedChunkCount =
+    job.processedChunkIndexes.size +
+    new Set(job.failedChunks.map((item) => item.chunkIndex)).size;
+  job.progress = Math.min(
+    100,
+    Math.round((completedChunkCount / job.totalChunks) * 100),
+  );
+};
+
+const finalizeImportJobIfDone = (job) => {
+  if (!job.finalizeRequested || job.isProcessing || job.queue.length > 0) {
+    return;
+  }
+
+  const doneCount =
+    job.processedChunkIndexes.size +
+    new Set(job.failedChunks.map((item) => item.chunkIndex)).size;
+
+  if (doneCount < job.totalChunks) {
+    return;
+  }
+
+  if (job.failedChunks.length > 0) {
+    job.status = "needs_retry";
+  } else {
+    job.status = "completed";
+    job.completedAt = nowIso();
+  }
+
+  updateImportJobProgress(job);
+  emitImportJobUpdate(job);
+};
+
+const processImportQueue = async (job) => {
+  if (job.isProcessing || job.cancelRequested) return;
+  job.isProcessing = true;
+  if (job.status === "queued") job.status = "processing";
+  emitImportJobUpdate(job);
+
+  console.info("[TransactionsImport] processImportQueue:start", {
+    jobId: job.id,
+    userId: job.userId,
+    queueSize: job.queue.length,
+    processedChunks: job.processedChunkIndexes.size,
+  });
+
+  while (job.queue.length > 0) {
+    if (job.cancelRequested) break;
+    const payload = job.queue.shift();
+    const { chunkIndex, rows } = payload;
+
+    if (job.processedChunkIndexes.has(chunkIndex)) {
+      continue;
+    }
+
+    try {
+      const transactions = rows
+        .map((row) => buildTransactionFromChunkRow(row, job.userId, job))
+        .filter(Boolean);
+
+      const skippedRows = rows.length - transactions.length;
+      if (skippedRows > 0) {
+        job.skippedRows += skippedRows;
+      }
+
+      if (transactions.length === 0) {
+        job.processedChunkIndexes.add(chunkIndex);
+        clearFailedChunk(job, chunkIndex);
+        updateImportJobProgress(job);
+        emitImportJobUpdate(job);
+        continue;
+      }
+
+      const savedTransactions = await saveTransactionsBatch(transactions, job.userId, {
+        source: "import-job",
+        jobId: job.id,
+        fileName: job.fileName,
+      });
+      const insertedCount = savedTransactions.length;
+
+      if (insertedCount < transactions.length) {
+        markFailedChunk(
+          job,
+          chunkIndex,
+          rows,
+          `Partial insert (${insertedCount}/${transactions.length})`,
+        );
+      } else {
+        clearFailedChunk(job, chunkIndex);
+      }
+
+      job.createdCount += insertedCount;
+      job.completedRows += rows.length;
+      job.processedChunkIndexes.add(chunkIndex);
+      updateImportJobProgress(job);
+      emitImportJobUpdate(job);
+    } catch (error) {
+      console.error("[TransactionsImport] processImportQueue:chunk-failed", {
+        jobId: job.id,
+        userId: job.userId,
+        chunkIndex,
+        message: error.message,
+      });
+      markFailedChunk(job, chunkIndex, rows, error.message);
+      job.errors.push({ at: nowIso(), chunkIndex, message: error.message });
+      job.completedRows += rows.length;
+      updateImportJobProgress(job);
+      emitImportJobUpdate(job);
+    }
+  }
+
+  job.isProcessing = false;
+  console.info("[TransactionsImport] processImportQueue:end", {
+    jobId: job.id,
+    userId: job.userId,
+    status: job.status,
+    completedRows: job.completedRows,
+    failedChunks: job.failedChunks.length,
+  });
+  finalizeImportJobIfDone(job);
+};
+
+const queueImportChunk = (job, chunkIndex, rows) => {
+  if (job.cancelRequested || job.status === "canceled") {
+    return false;
+  }
+
+  if (job.processedChunkIndexes.has(chunkIndex)) {
+    return true;
+  }
+
+  const existingQueueItem = job.queue.find((item) => item.chunkIndex === chunkIndex);
+  if (existingQueueItem) {
+    existingQueueItem.rows = rows;
+  } else {
+    job.queue.push({ chunkIndex, rows });
+  }
+
+  setImmediate(() => {
+    processImportQueue(job).catch((error) => {
+      job.status = "failed";
+      job.errors.push({ at: nowIso(), message: error.message });
+      emitImportJobUpdate(job);
+    });
+  });
+
+  emitImportJobUpdate(job);
+  return true;
+};
+
+const sweepExpiredImportJobs = () => {
+  const now = Date.now();
+  for (const [key, job] of importJobs.entries()) {
+    const age = now - new Date(job.updatedAt || job.createdAt).getTime();
+    if (age <= IMPORT_JOB_TTL_MS) continue;
+    importJobs.delete(key);
+  }
+};
+
+setInterval(sweepExpiredImportJobs, 1000 * 60 * 10).unref();
 
 // Helper function to extract data from Excel
 const extractDataFromExcel = (filePath) => {
@@ -100,9 +460,23 @@ const extractDataFromExcel = (filePath) => {
     const workbook = XLSX.readFile(filePath);
     console.log("Sheet names:", workbook.SheetNames);
 
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
-    const data = XLSX.utils.sheet_to_json(worksheet);
+    const data = [];
+
+    workbook.SheetNames.forEach((sheetName) => {
+      const worksheet = workbook.Sheets[sheetName];
+      const sheetRows = XLSX.utils.sheet_to_json(worksheet, {
+        defval: "",
+        raw: true,
+      });
+
+      sheetRows.forEach((row, index) => {
+        data.push({
+          ...row,
+          __sheetName: sheetName,
+          __rowIndex: index + 1,
+        });
+      });
+    });
 
     console.log("Extracted rows count:", data.length);
     console.log("First few rows:", data.slice(0, 3));
@@ -288,6 +662,285 @@ const analyzeWithAI = async (data, fileType) => {
   } catch (error) {
     console.error("AI Analysis error:", error);
     return [];
+  }
+};
+
+// --- Import job API handlers ---
+const createImportJob = async (req, res) => {
+  try {
+    const userId = req.user && req.user._id;
+    if (!userId) return res.status(401).json({ error: "User not authenticated" });
+
+    if (!isDatabaseReady()) {
+      console.warn("[TransactionsImport] createImportJob:database-unavailable", {
+        userId: String(userId),
+        fileName: req.body?.fileName,
+      });
+    }
+
+    console.info("[TransactionsImport] createImportJob", {
+      userId: String(userId),
+      fileName: req.body?.fileName,
+      fileType: req.body?.fileType,
+      fileSize: req.body?.fileSize,
+    });
+
+    const jobId = crypto.randomUUID();
+    const job = {
+      id: jobId,
+      userId,
+      fileName: req.body?.fileName || `upload-${jobId}`,
+      fileType: req.body?.fileType || "csv",
+      fileSize: Number(req.body?.fileSize) || 0,
+      status: "queued",
+      queue: [],
+      processedChunkIndexes: new Set(),
+      failedChunks: [],
+      failedChunkData: new Map(),
+      createdCount: 0,
+      skippedRows: 0,
+      completedRows: 0,
+      totalRows: 0,
+      totalChunks: 0,
+      progress: 0,
+      degradedMode: !isDatabaseReady(),
+      cancelRequested: false,
+      finalizeRequested: false,
+      isProcessing: false,
+      errors: [],
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+    };
+
+    importJobs.set(getImportJobKey(userId, jobId), job);
+    emitImportJobUpdate(job);
+
+    console.info("[TransactionsImport] createImportJob:success", {
+      userId: String(userId),
+      jobId,
+    });
+
+    res.json({ jobId });
+  } catch (error) {
+    console.error("[TransactionsImport] createImportJob:failed", error.message);
+    console.error("Failed to create import job:", error);
+    res.status(500).json({ error: "Failed to create import job" });
+  }
+};
+
+const getImportJob = async (req, res) => {
+  try {
+    const userId = req.user && req.user._id;
+    const { jobId } = req.params;
+    const key = getImportJobKey(userId, jobId);
+    const job = importJobs.get(key);
+    console.info("[TransactionsImport] getImportJob", { userId: String(userId), jobId, found: !!job });
+    if (!job) return res.status(404).json({ error: "Import job not found" });
+    res.json(serializeImportJob(job));
+  } catch (error) {
+    console.error("Failed to get import job:", error);
+    res.status(500).json({ error: "Failed to get import job" });
+  }
+};
+
+const streamImportJob = async (req, res) => {
+  try {
+    const userId = req.user && req.user._id;
+    const { jobId } = req.params;
+    const key = getImportJobKey(userId, jobId);
+    const job = importJobs.get(key);
+    console.info("[TransactionsImport] streamImportJob:open", {
+      userId: String(userId),
+      jobId,
+      found: !!job,
+      status: job?.status,
+    });
+    if (!job) return res.status(404).json({ error: "Import job not found" });
+
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders && res.flushHeaders();
+
+    const listener = (payload) => {
+      console.info("[TransactionsImport] streamImportJob:update", {
+        jobId,
+        status: payload.status,
+        progress: payload.progress,
+        completedRows: payload.completedRows,
+        failedChunks: payload.failedChunks?.length || 0,
+      });
+      try {
+        res.write(`data: ${JSON.stringify(payload)}\n\n`);
+      } catch (e) {
+        // ignore
+      }
+    };
+
+    importJobEvents.on(key, listener);
+
+    // send initial state
+    res.write(`data: ${JSON.stringify(serializeImportJob(job))}\n\n`);
+
+    req.on("close", () => {
+      importJobEvents.removeListener(key, listener);
+      console.info("[TransactionsImport] streamImportJob:close", { userId: String(userId), jobId });
+    });
+  } catch (error) {
+    console.error("Failed to stream import job:", error);
+    res.status(500).end();
+  }
+};
+
+const addImportChunk = async (req, res) => {
+  try {
+    const userId = req.user && req.user._id;
+    const { jobId } = req.params;
+    const { chunkIndex, rows, totalChunks, totalRows } = req.body || {};
+
+    console.info("[TransactionsImport] addImportChunk", {
+      userId: String(userId),
+      jobId,
+      chunkIndex,
+      rowCount: Array.isArray(rows) ? rows.length : 0,
+      totalChunks,
+      totalRows,
+    });
+
+    if (!Number.isFinite(chunkIndex))
+      return res.status(400).json({ error: "chunkIndex is required" });
+    if (!Array.isArray(rows))
+      return res.status(400).json({ error: "rows must be an array" });
+
+    const key = getImportJobKey(userId, jobId);
+    const job = importJobs.get(key);
+    if (!job) return res.status(404).json({ error: "Import job not found" });
+
+    const numericChunkIndex = Number(chunkIndex);
+    const numericTotalChunks = Number(totalChunks);
+    const numericTotalRows = Number(totalRows);
+
+    if (Number.isInteger(numericChunkIndex) && numericChunkIndex >= 0) {
+      job.totalChunks = Math.max(
+        Number(job.totalChunks || 0),
+        numericChunkIndex + 1,
+        Number.isFinite(numericTotalChunks) ? numericTotalChunks : 0,
+      );
+    }
+
+    if (Number.isFinite(numericTotalRows) && numericTotalRows > 0) {
+      job.totalRows = Math.max(Number(job.totalRows || 0), numericTotalRows);
+    } else {
+      job.totalRows = Math.max(
+        Number(job.totalRows || 0),
+        Number(job.completedRows || 0) + rows.length,
+      );
+    }
+
+    const accepted = queueImportChunk(job, Number(chunkIndex), rows);
+    if (!accepted) {
+      console.warn("[TransactionsImport] addImportChunk:rejected", {
+        userId: String(userId),
+        jobId,
+        chunkIndex,
+      });
+      return res.status(400).json({ error: "Job canceled or not accepting chunks" });
+    }
+
+    console.info("[TransactionsImport] addImportChunk:accepted", {
+      userId: String(userId),
+      jobId,
+      chunkIndex,
+      queueSize: job.queue.length,
+    });
+
+    res.json({ ok: true });
+  } catch (error) {
+    console.error("Failed to add import chunk:", error);
+    res.status(500).json({ error: "Failed to add import chunk" });
+  }
+};
+
+const finalizeImportJob = async (req, res) => {
+  try {
+    const userId = req.user && req.user._id;
+    const { jobId } = req.params;
+    const key = getImportJobKey(userId, jobId);
+    const job = importJobs.get(key);
+    if (!job) return res.status(404).json({ error: "Import job not found" });
+
+    console.info("[TransactionsImport] finalizeImportJob", {
+      userId: String(userId),
+      jobId,
+      status: job.status,
+      queueSize: job.queue.length,
+      processedChunks: job.processedChunkIndexes.size,
+    });
+
+    job.finalizeRequested = true;
+    emitImportJobUpdate(job);
+    setImmediate(() => processImportQueue(job));
+
+    res.json(serializeImportJob(job));
+  } catch (error) {
+    console.error("Failed to finalize import job:", error);
+    res.status(500).json({ error: "Failed to finalize import job" });
+  }
+};
+
+const retryImportChunks = async (req, res) => {
+  try {
+    const userId = req.user && req.user._id;
+    const { jobId } = req.params;
+    const { chunkIndexes } = req.body || {};
+    const key = getImportJobKey(userId, jobId);
+    const job = importJobs.get(key);
+    if (!job) return res.status(404).json({ error: "Import job not found" });
+
+    console.info("[TransactionsImport] retryImportChunks", {
+      userId: String(userId),
+      jobId,
+      chunkIndexes,
+      failedChunks: job.failedChunks.map((item) => item.chunkIndex),
+    });
+
+    const toRetry = Array.isArray(chunkIndexes) && chunkIndexes.length ? chunkIndexes : job.failedChunks.map((c) => c.chunkIndex);
+    for (const idx of toRetry) {
+      const rows = job.failedChunkData.get(idx) || null;
+      if (!rows) continue;
+      clearFailedChunk(job, idx);
+      queueImportChunk(job, idx, rows);
+    }
+
+    res.json(serializeImportJob(job));
+  } catch (error) {
+    console.error("Failed to retry import chunks:", error);
+    res.status(500).json({ error: "Failed to retry import chunks" });
+  }
+};
+
+const cancelImportJob = async (req, res) => {
+  try {
+    const userId = req.user && req.user._id;
+    const { jobId } = req.params;
+    const key = getImportJobKey(userId, jobId);
+    const job = importJobs.get(key);
+    if (!job) return res.status(404).json({ error: "Import job not found" });
+
+    console.info("[TransactionsImport] cancelImportJob", {
+      userId: String(userId),
+      jobId,
+      status: job.status,
+      queueSize: job.queue.length,
+    });
+
+    job.cancelRequested = true;
+    job.status = "canceled";
+    emitImportJobUpdate(job);
+    res.json(serializeImportJob(job));
+  } catch (error) {
+    console.error("Failed to cancel import job:", error);
+    res.status(500).json({ error: "Failed to cancel import job" });
   }
 };
 
@@ -701,6 +1354,7 @@ const uploadAndAnalyzeFile = async (req, res) => {
         if (transactions.length > 0) {
           // Save structured transactions directly to database using bulk insert (much faster)
           const userId = req.user._id;
+          const localStore = useLocalTransactionStore(userId);
           console.log(
             `Starting to save ${transactions.length} transactions for user: ${userId}`,
           );
@@ -744,15 +1398,22 @@ const uploadAndAnalyzeFile = async (req, res) => {
           // Bulk insert - much faster than individual saves
           let savedTransactions = [];
           try {
-            savedTransactions = await Transaction.insertMany(
-              transactionsToInsert,
-              {
-                ordered: false, // Continue on error
-              },
-            );
-            console.log(
-              `✅ Successfully bulk inserted ${savedTransactions.length} transactions`,
-            );
+            if (localStore) {
+              savedTransactions = await localTransactionStore.createTransactions(
+                transactionsToInsert,
+                { userId, meta: { source: "structured-excel" } },
+              );
+            } else {
+              savedTransactions = await Transaction.insertMany(
+                transactionsToInsert,
+                {
+                  ordered: false, // Continue on error
+                },
+              );
+              console.log(
+                `✅ Successfully bulk inserted ${savedTransactions.length} transactions`,
+              );
+            }
           } catch (bulkError) {
             // insertMany with ordered:false still inserts valid docs even if some fail
             if (bulkError.insertedDocs) {
@@ -831,6 +1492,7 @@ const uploadAndAnalyzeFile = async (req, res) => {
 
     // Save transactions to database using bulk insert (faster)
     const userId = req.user._id; // Get user ID from authenticated user
+    const localStore = useLocalTransactionStore(userId);
 
     const transactionsToInsert = aiAnalysis.map((transaction) => ({
       userId: userId,
@@ -861,12 +1523,19 @@ const uploadAndAnalyzeFile = async (req, res) => {
     // Bulk insert for better performance
     let savedTransactions = [];
     try {
-      savedTransactions = await Transaction.insertMany(transactionsToInsert, {
-        ordered: false, // Continue even if some fail
-      });
-      console.log(
-        `✅ Successfully bulk inserted ${savedTransactions.length} AI-analyzed transactions`,
-      );
+      if (localStore) {
+        savedTransactions = await localTransactionStore.createTransactions(
+          transactionsToInsert,
+          { userId, meta: { source: "ai-analysis" } },
+        );
+      } else {
+        savedTransactions = await Transaction.insertMany(transactionsToInsert, {
+          ordered: false, // Continue even if some fail
+        });
+        console.log(
+          `✅ Successfully bulk inserted ${savedTransactions.length} AI-analyzed transactions`,
+        );
+      }
     } catch (bulkError) {
       // insertMany with ordered:false still inserts valid docs
       if (bulkError.insertedDocs) {
@@ -931,6 +1600,7 @@ const createTransaction = async (req, res) => {
     }
 
     const userId = req.user._id;
+    const localStore = useLocalTransactionStore(userId);
     const {
       date,
       desc,
@@ -981,9 +1651,24 @@ const createTransaction = async (req, res) => {
       reference: reference ? String(reference) : undefined,
       account: account ? String(account) : undefined,
       paymentMethod: paymentMethod ? String(paymentMethod) : undefined,
+      duplicateHash: buildDuplicateHash({
+        userId,
+        date: parsedDate,
+        desc: String(desc),
+        amount: Math.abs(parsedAmount),
+        vendor,
+      }),
     });
 
-    const saved = await transaction.save();
+    let saved;
+    if (useLocalTransactionStore(userId)) {
+      saved = await localTransactionStore.createTransaction(transaction.toObject(), {
+        userId,
+        meta: { source: "manual-entry" },
+      });
+    } else {
+      saved = await transaction.save();
+    }
     console.log(
       "✅ Transaction saved with ID:",
       saved._id,
@@ -1008,9 +1693,43 @@ const getTransactions = async (req, res) => {
     }
 
     const userId = req.user._id;
-    const { page = 1, limit = 1000, category, status, type } = req.query;
+    const {
+      page = 1,
+      limit = 1000,
+      category,
+      status,
+      type,
+      search,
+      dateFrom,
+      dateTo,
+      sort = "date",
+      direction = "desc",
+    } = req.query;
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
     const limitNum = Math.max(1, Math.min(5000, parseInt(limit, 10) || 1000));
+
+    if (useLocalTransactionStore(userId)) {
+      const localResult = await localTransactionStore.listTransactions({
+        userId,
+        page: pageNum,
+        limit: limitNum,
+        category,
+        status,
+        type,
+        search,
+        dateFrom,
+        dateTo,
+        sort,
+        direction,
+      });
+
+      return res.json({
+        transactions: localResult.transactions,
+        totalPages: localResult.totalPages,
+        currentPage: localResult.currentPage,
+        total: localResult.total,
+      });
+    }
 
     const filter = { userId };
     if (category) filter.category = category;
@@ -1028,6 +1747,28 @@ const getTransactions = async (req, res) => {
       }
     }
 
+    if (search && String(search).trim()) {
+      const searchTerm = String(search).trim();
+      filter.$or = [
+        { desc: { $regex: searchTerm, $options: "i" } },
+        { category: { $regex: searchTerm, $options: "i" } },
+        { vendor: { $regex: searchTerm, $options: "i" } },
+        { status: { $regex: searchTerm, $options: "i" } },
+      ];
+    }
+
+    if (dateFrom || dateTo) {
+      filter.date = {};
+      const from = dateFrom ? new Date(dateFrom) : null;
+      const to = dateTo ? new Date(dateTo) : null;
+      if (from && !Number.isNaN(from.getTime())) filter.date.$gte = from;
+      if (to && !Number.isNaN(to.getTime())) {
+        to.setHours(23, 59, 59, 999);
+        filter.date.$lte = to;
+      }
+      if (!Object.keys(filter.date).length) delete filter.date;
+    }
+
     console.log(
       "Fetching transactions for user:",
       userId,
@@ -1037,8 +1778,13 @@ const getTransactions = async (req, res) => {
       limitNum,
     );
 
+    const allowedSorts = new Set(["date", "amount", "category", "type", "status", "vendor", "createdAt"]);
+    const sortField = allowedSorts.has(String(sort)) ? String(sort) : "date";
+    const sortDirection = String(direction).toLowerCase() === "asc" ? 1 : -1;
+    const sortSpec = { [sortField]: sortDirection, _id: sortDirection };
+
     const transactions = await Transaction.find(filter)
-      .sort({ date: -1 })
+      .sort(sortSpec)
       .limit(limitNum)
       .skip((pageNum - 1) * limitNum);
 
@@ -1064,7 +1810,7 @@ const getTransactions = async (req, res) => {
 
     res.json({
       transactions: transactions.map((t) => {
-        const obj = t.toObject();
+        const obj = serializeTransactionDocument(t);
         // Ensure type and status are normalized
         obj.type = normalizeTransactionType(obj.type) || obj.type;
         obj.status = normalizeStatus(obj.status) || obj.status;
@@ -1125,6 +1871,15 @@ const updateTransaction = async (req, res) => {
       if (!Number.isNaN(parsedDate.getTime())) updates.date = parsedDate;
     }
 
+    if (localStore) {
+      const transaction = await localTransactionStore.updateTransaction(id, userId, updates);
+      if (!transaction) {
+        return res.status(404).json({ error: "Transaction not found" });
+      }
+
+      return res.json(transaction);
+    }
+
     const transaction = await Transaction.findOneAndUpdate(
       { _id: id, userId },
       { $set: updates },
@@ -1147,6 +1902,16 @@ const deleteTransaction = async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user._id;
+    const localStore = useLocalTransactionStore(userId);
+
+    if (localStore) {
+      const transaction = await localTransactionStore.deleteTransaction(id, userId);
+      if (!transaction) {
+        return res.status(404).json({ error: "Transaction not found" });
+      }
+
+      return res.json({ message: "Transaction deleted successfully" });
+    }
 
     const transaction = await Transaction.findOneAndDelete({ _id: id, userId });
 
@@ -1170,6 +1935,7 @@ const bulkDeleteTransactions = async (req, res) => {
 
     const { ids } = req.body;
     const userId = req.user._id;
+    const localStore = useLocalTransactionStore(userId);
 
     if (!Array.isArray(ids) || ids.length === 0) {
       console.log("Validation failed: No IDs provided");
@@ -1177,10 +1943,12 @@ const bulkDeleteTransactions = async (req, res) => {
     }
 
     console.log("Attempting to delete", ids.length, "transactions");
-    const result = await Transaction.deleteMany({
-      _id: { $in: ids },
-      userId: userId,
-    });
+    const result = localStore
+      ? await localTransactionStore.deleteMany(ids, userId)
+      : await Transaction.deleteMany({
+          _id: { $in: ids },
+          userId: userId,
+        });
 
     console.log("Deleted", result.deletedCount, "transactions");
     res.json({
@@ -1202,17 +1970,24 @@ const deleteAllTransactions = async (req, res) => {
     const userId = req.user._id;
 
     // First, count how many transactions exist
-    const countBefore = await Transaction.countDocuments({ userId: userId });
+    const localStore = useLocalTransactionStore(userId);
+    const countBefore = localStore
+      ? (await localTransactionStore.listTransactions({ userId, page: 1, limit: 1 })).total
+      : await Transaction.countDocuments({ userId: userId });
     console.log(
       `Found ${countBefore} transactions to delete for user:`,
       userId,
     );
 
     // Delete all transactions for this user
-    const result = await Transaction.deleteMany({ userId: userId });
+    const result = localStore
+      ? await localTransactionStore.deleteAll(userId)
+      : await Transaction.deleteMany({ userId: userId });
 
     // Verify deletion
-    const countAfter = await Transaction.countDocuments({ userId: userId });
+    const countAfter = localStore
+      ? (await localTransactionStore.listTransactions({ userId, page: 1, limit: 1 })).total
+      : await Transaction.countDocuments({ userId: userId });
     console.log(`Deleted ${result.deletedCount} transactions`);
     console.log(`Remaining transactions: ${countAfter}`);
 
@@ -1244,13 +2019,60 @@ const getTransactionStats = async (req, res) => {
       return res.status(401).json({ error: "User not authenticated" });
     }
 
-    // Convert userId string to ObjectId for aggregation
-    const userId = new mongoose.Types.ObjectId(req.user._id);
+    const { category, status, type, search, dateFrom, dateTo } = req.query;
+
+    const userId = req.user._id;
+    const localStore = useLocalTransactionStore(userId);
 
     console.log("Fetching stats for user:", userId);
 
+    const filter = { userId };
+    if (category) filter.category = category;
+    if (status) filter.status = normalizeStatus(status) || status;
+    if (type) {
+      const normalizedFilterType = normalizeTransactionType(type);
+      if (normalizedFilterType) {
+        filter.type = normalizedFilterType;
+      }
+    }
+
+    if (search && String(search).trim()) {
+      const searchTerm = String(search).trim();
+      filter.$or = [
+        { desc: { $regex: searchTerm, $options: "i" } },
+        { category: { $regex: searchTerm, $options: "i" } },
+        { vendor: { $regex: searchTerm, $options: "i" } },
+        { status: { $regex: searchTerm, $options: "i" } },
+      ];
+    }
+
+    if (dateFrom || dateTo) {
+      filter.date = {};
+      const from = dateFrom ? new Date(dateFrom) : null;
+      const to = dateTo ? new Date(dateTo) : null;
+      if (from && !Number.isNaN(from.getTime())) filter.date.$gte = from;
+      if (to && !Number.isNaN(to.getTime())) {
+        to.setHours(23, 59, 59, 999);
+        filter.date.$lte = to;
+      }
+      if (!Object.keys(filter.date).length) delete filter.date;
+    }
+
+    if (localStore) {
+      const localStats = await localTransactionStore.getStats({
+        userId,
+        category,
+        status,
+        type,
+        search,
+        dateFrom,
+        dateTo,
+      });
+      return res.json(localStats);
+    }
+
     const stats = await Transaction.aggregate([
-      { $match: { userId: userId } },
+      { $match: filter },
       {
         $group: {
           _id: null,
@@ -1275,7 +2097,7 @@ const getTransactionStats = async (req, res) => {
     ]);
 
     const categoryStats = await Transaction.aggregate([
-      { $match: { userId: userId } },
+      { $match: filter },
       {
         $group: {
           _id: "$category",
@@ -1311,6 +2133,13 @@ const getTransactionStats = async (req, res) => {
 module.exports = {
   upload,
   uploadAndAnalyzeFile,
+  createImportJob,
+  getImportJob,
+  streamImportJob,
+  addImportChunk,
+  finalizeImportJob,
+  retryImportChunks,
+  cancelImportJob,
   createTransaction,
   getTransactions,
   updateTransaction,

@@ -4,7 +4,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
-import { Helmet } from "react-helmet";
+import { Helmet } from "../../components/Head/Helmet";
 import { AuthContext } from "../../Context/AuthContext";
 import { api } from "../../config/api";
 

@@ -14,15 +14,61 @@ import Register from "./Component/Register/Register.jsx";
 import ForgotPassword from "./Component/ForgotPassword/ForgotPassword.jsx";
 import ResetPassword from "./Component/ResetPassword/ResetPassword.jsx";
 import Home from "./Component/Home/Home.jsx";
+import DashboardLayout from "./layouts/DashboardLayout";
 import ExcelGenerator from "./Component/BoxCalculator/BoxCalculator.jsx";
-import Transactions from "./Component/Transactions/Transactions.jsx";
+const Transactions = React.lazy(() => import("./components/Transactions/TransactionsPage.jsx"));
+import TransactionsLayout from "./layouts/TransactionsLayout";
 import AIExcelGenerator from "./Component/AIExcelGenerator/AIExcelGenerator.jsx";
 import Chatbot from "./Component/Chatbot/Chatbot.jsx";
+const AIChartsPage = React.lazy(() => import("./pages/AICharts/AIChartsPage.jsx"));
 import ChartGenerator from "./Component/ChartGenerator/ChartGenerator.jsx";
 import ProtectedRoute from "./Component/ProtectedRoute/ProtectedRoute.jsx";
+import ExcelUploadPage from "./components/ExcelEditor/ExcelUploadPage.jsx";
+import ExcelEditorPage from "./components/ExcelEditor/ExcelEditorPage.jsx";
+
+class RouteErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+
+  componentDidCatch(error, info) {
+    console.error("Route render failed", error, info);
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="grid min-h-[60vh] place-items-center p-6">
+          <div className="max-w-lg rounded-2xl border border-red-200 bg-white p-6 text-center shadow-xl">
+            <h2 className="text-xl font-bold text-red-700">
+              This page failed to render
+            </h2>
+            <p className="mt-2 text-sm text-gray-600">
+              {this.state.error.message || "A runtime error interrupted the page."}
+            </p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="mt-4 ui-btn"
+            >
+              Reload page
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 export default function App() {
-  const { token, Logout } = useContext(AuthContext);
+  const { token, authReady, Logout } = useContext(AuthContext);
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -116,7 +162,13 @@ export default function App() {
         }}
       />
 
-      {token && !isAuthPage ? (
+      {!authReady ? (
+        <div className="grid min-h-screen place-items-center ui-shell">
+          <div className="rounded-2xl border border-white/10 bg-white/80 px-6 py-4 text-sm font-semibold text-[color:var(--ui-ink)] shadow-lg backdrop-blur">
+            Restoring session...
+          </div>
+        </div>
+      ) : token && !isAuthPage ? (
         // Sidebar Layout for Authenticated Users
         <div className="flex h-screen overflow-hidden">
           {/* Sidebar */}
@@ -244,6 +296,32 @@ export default function App() {
                   />
                 </svg>
                 <span className="font-medium">AI Excel Generator</span>
+              </Link>
+
+              <Link
+                to="/excel-editor"
+                onClick={() => setSidebarOpen(false)}
+                className={`ui-navlink flex items-center gap-3 ${
+                  isActive("/excel-editor") ||
+                  location.pathname.startsWith("/excel/")
+                    ? "ui-navlink-active"
+                    : ""
+                }`}
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                  />
+                </svg>
+                <span className="font-medium">Excel Editor</span>
               </Link>
 
               <Link
@@ -432,6 +510,9 @@ export default function App() {
                     ? "Transactions"
                     : isActive("/ai-excel")
                     ? "AI Excel Generator"
+                    : isActive("/excel-editor") ||
+                      location.pathname.startsWith("/excel/")
+                    ? "Excel Editor"
                     : isActive("/chatbot")
                     ? "AI Chatbot"
                     : "Calculator"}
@@ -452,7 +533,9 @@ export default function App() {
                   path="/"
                   element={
                     <ProtectedRoute>
-                      <Home />
+                      <DashboardLayout>
+                        <Home />
+                      </DashboardLayout>
                     </ProtectedRoute>
                   }
                 />
@@ -460,7 +543,21 @@ export default function App() {
                   path="/transactions"
                   element={
                     <ProtectedRoute>
-                      <Transactions />
+                      <React.Suspense
+                        fallback={
+                          <div className="flex min-h-[60vh] items-center justify-center">
+                            <div className="rounded-3xl border border-white/10 bg-white/80 px-6 py-4 text-sm text-slate-600 shadow-lg backdrop-blur dark:bg-slate-950/70 dark:text-slate-300">
+                              Loading transactions workspace...
+                            </div>
+                          </div>
+                        }
+                      >
+                        <RouteErrorBoundary>
+                          <TransactionsLayout>
+                            <Transactions />
+                          </TransactionsLayout>
+                        </RouteErrorBoundary>
+                      </React.Suspense>
                     </ProtectedRoute>
                   }
                 />
@@ -481,6 +578,22 @@ export default function App() {
                   }
                 />
                 <Route
+                  path="/excel-editor"
+                  element={
+                    <ProtectedRoute>
+                      <ExcelUploadPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/excel/:fileId"
+                  element={
+                    <ProtectedRoute>
+                      <ExcelEditorPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
                   path="/chatbot"
                   element={
                     <ProtectedRoute>
@@ -492,7 +605,11 @@ export default function App() {
                   path="/charts"
                   element={
                     <ProtectedRoute>
-                      <ChartGenerator />
+                      <React.Suspense fallback={<div className="p-6">Loading AI Charts...</div>}>
+                        <RouteErrorBoundary>
+                          <AIChartsPage />
+                        </RouteErrorBoundary>
+                      </React.Suspense>
                     </ProtectedRoute>
                   }
                 />

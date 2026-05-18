@@ -27,3 +27,13 @@ dist-ssr
 .env
 .env.*
 !.env.example
+
+# Local uploads and test artifacts (do not commit)
+/backend/uploads/
+/backend/test-*.csv
+/backend/test-*.xlsx
+/backend/probe.*
+
+# Frontend local env and build
+/frontend/.env.local
+/frontend/dist/

@@ -4,6 +4,7 @@ export const AuthContext = createContext();
 
 const AuthContextProvider = ({ children }) => {
   const [token, setToken] = useState(null);
+  const [authReady, setAuthReady] = useState(false);
 
   function SetUserToken(tkn) {
     setToken(tkn);
@@ -16,10 +17,11 @@ const AuthContextProvider = ({ children }) => {
     if (localStorage.getItem("token") != null) {
       setToken(localStorage.getItem("token"));
     }
+    setAuthReady(true);
   }, []);
 
   return (
-    <AuthContext.Provider value={{ token, SetUserToken , Logout }}>
+    <AuthContext.Provider value={{ token, authReady, SetUserToken , Logout }}>
       {children}
     </AuthContext.Provider>
   );

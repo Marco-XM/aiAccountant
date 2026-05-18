@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import toast from "react-hot-toast";
-import { Helmet } from "react-helmet";
+import { Helmet } from "../../components/Head/Helmet";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../../config/api";
 

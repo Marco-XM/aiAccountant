@@ -1,5 +1,6 @@
 const rateLimit = require("express-rate-limit");
 const { RATE_LIMIT } = require("../config/constants");
+const isProduction = process.env.NODE_ENV === "production";
 
 const jsonMessage = (message) => ({
   success: false,
@@ -44,6 +45,7 @@ const authLimiter = rateLimit({
   message: jsonMessage(
     "Too many authentication attempts. Please try again later.",
   ),
+  skip: () => !isProduction,
 });
 
 module.exports = {

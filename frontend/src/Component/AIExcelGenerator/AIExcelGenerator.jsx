@@ -1,5 +1,5 @@
 import React, { useState, useContext } from "react";
-import { Helmet } from "react-helmet";
+import { Helmet } from "../../components/Head/Helmet";
 import toast from "react-hot-toast";
 import { AuthContext } from "../../Context/AuthContext";
 import { api, API_ORIGIN } from "../../config/api";

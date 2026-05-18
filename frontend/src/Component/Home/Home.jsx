@@ -1,850 +1,580 @@
-import React, { useContext, useState, useEffect } from "react";
-import { Helmet } from "react-helmet";
+import React, { useCallback, useContext, useEffect, useState } from "react";
+import { Helmet } from "../../components/Head/Helmet";
 import { Link } from "react-router-dom";
-import { AuthContext } from "../../Context/AuthContext";
-import { api } from "../../config/api";
 import {
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  AreaChart,
   Area,
-  ComposedChart,
-  RadarChart,
-  Radar,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  Cell,
 } from "recharts";
 import toast from "react-hot-toast";
+import { AuthContext } from "../../Context/AuthContext";
+import { api } from "../../config/api";
+import { useBackendHealth } from "../../Context/BackendHealthContext";
+
+const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+const compact = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
+const percent = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
+
+const EMPTY_DASHBOARD = {
+  summary: {
+    totalTransactions: 0,
+    revenue: 0,
+    expenses: 0,
+    netProfit: 0,
+    cashFlow: 0,
+    monthlyGrowth: 0,
+    burnRate: 0,
+    runway: 0,
+    taxEstimate: 0,
+    profitMargin: 0,
+    pendingCount: 0,
+    outstandingInvoices: 0,
+    bankBalance: 0,
+    budgetUsage: 0,
+    payrollEstimate: 0,
+    subscriptionCosts: 0,
+    reconciliationCount: 0,
+  },
+  monthlyTrend: [],
+  topCategories: [],
+  topVendors: [],
+  heatmap: [],
+  recentTransactions: [],
+  suspicious: [],
+  insights: [],
+  workflow: { approvals: 0, reconciliation: 0, duplicateCount: 0, uncategorized: 0, reminders: [], tasks: [] },
+};
+
+const icons = {
+  search: "m21 21-4.35-4.35M18 11a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z",
+  spark: "M13 3 4 14h7l-1 7 9-12h-7l1-6Z",
+  arrow: "M13 7l5 5m0 0-5 5m5-5H6",
+  upload: "M12 16V4m0 0 4 4m-4-4-4 4M4 20h16",
+  report: "M8 3h8l4 4v14H4V3h4Zm8 0v5h5M8 13h8M8 17h5",
+  command: "M8 9h8M8 15h8M5 5h14v14H5z",
+  close: "M6 6l12 12M18 6 6 18",
+  check: "m5 13 4 4L19 7",
+  alert: "M12 9v4m0 4h.01M10.3 3.86 1.82 18a2 2 0 0 0 1.72 3h16.92a2 2 0 0 0 1.72-3L13.7 3.86a2 2 0 0 0-3.4 0Z",
+};
+
+const Icon = ({ name, className = "h-4 w-4" }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+    <path d={icons[name]} strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+  </svg>
+);
+
+const cn = (...values) => values.filter(Boolean).join(" ");
+
+const Button = ({ children, variant = "secondary", className = "", ...props }) => {
+  const variants = {
+    primary: "bg-slate-950 text-white shadow-[0_14px_34px_rgba(15,23,42,.22)] hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200",
+    secondary: "border border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900",
+    quiet: "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900",
+    danger: "border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-400/30 dark:bg-red-400/10 dark:text-red-200",
+  };
+  return (
+    <button type="button" className={cn("inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl px-3.5 text-sm font-semibold transition disabled:pointer-events-none disabled:opacity-50", variants[variant], className)} {...props}>
+      {children}
+    </button>
+  );
+};
+
+const Panel = ({ children, className = "" }) => (
+  <section className={cn("min-w-0 rounded-2xl border border-slate-200 bg-white shadow-[0_16px_44px_rgba(15,23,42,.07)] dark:border-white/10 dark:bg-slate-950", className)}>
+    {children}
+  </section>
+);
+
+const Pill = ({ children, tone = "neutral" }) => {
+  const tones = {
+    neutral: "border-slate-200 bg-white text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300",
+    blue: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-400/30 dark:bg-blue-400/10 dark:text-blue-200",
+    green: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-200",
+    red: "border-red-200 bg-red-50 text-red-700 dark:border-red-400/30 dark:bg-red-400/10 dark:text-red-200",
+    amber: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200",
+  };
+  return <span className={cn("inline-flex max-w-full items-center rounded-full border px-2.5 py-1 text-xs font-semibold", tones[tone])}><span className="truncate">{children}</span></span>;
+};
+
+const Skeleton = ({ className = "" }) => <div className={cn("animate-pulse rounded-2xl bg-slate-200/80 dark:bg-slate-800", className)} />;
+
+const formatMoney = (value) => currency.format(Number(value || 0));
+const formatCompact = (value) => compact.format(Number(value || 0));
+
+const MetricCard = ({ label, value, change, detail, tone = "slate", trend = [] }) => {
+  const colors = {
+    slate: { line: "#475467", fill: "rgba(71,84,103,.12)", accent: "bg-slate-900" },
+    green: { line: "#10b981", fill: "rgba(16,185,129,.14)", accent: "bg-emerald-500" },
+    red: { line: "#f04438", fill: "rgba(240,68,56,.12)", accent: "bg-red-500" },
+    blue: { line: "#2563eb", fill: "rgba(37,99,235,.12)", accent: "bg-blue-500" },
+    amber: { line: "#f59e0b", fill: "rgba(245,158,11,.14)", accent: "bg-amber-500" },
+  };
+  const color = colors[tone] || colors.slate;
+  const positive = Number(change || 0) >= 0;
+
+  return (
+    <Panel className="relative overflow-hidden p-4">
+      <span className={cn("absolute inset-x-0 top-0 h-1", color.accent)} />
+      <div className="flex min-w-0 items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-medium text-slate-500 dark:text-slate-400">{label}</p>
+          <p className="mt-2 truncate text-2xl font-semibold tracking-tight text-slate-950 dark:text-white">{value}</p>
+          <p className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">{detail}</p>
+        </div>
+        <Pill tone={positive ? "green" : "red"}>{positive ? "+" : ""}{percent.format(change || 0)}%</Pill>
+      </div>
+      <div className="mt-3 flex h-12 items-end gap-1">
+        {(trend.length ? trend : [{ value: 0 }, { value: 0 }, { value: 0 }, { value: 0 }]).slice(-8).map((point, index, all) => {
+          const max = Math.max(1, ...all.map((item) => Math.abs(item.value || 0)));
+          const height = 18 + (Math.abs(point.value || 0) / max) * 28;
+          return <span key={`${point.value}-${index}`} className="flex-1 rounded-t-md" style={{ height, background: color.line, opacity: 0.18 + (index / Math.max(1, all.length - 1)) * 0.5 }} />;
+        })}
+      </div>
+    </Panel>
+  );
+};
+
+const CommandPalette = ({ open, onClose, actions }) => {
+  const [query, setQuery] = useState("");
+  const filtered = actions.filter((action) => action.label.toLowerCase().includes(query.toLowerCase()));
+  useEffect(() => { if (open) setQuery(""); }, [open]);
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 bg-slate-950/55 p-3 backdrop-blur-sm" onMouseDown={onClose}>
+      <div className="mx-auto mt-16 w-full max-w-xl overflow-hidden rounded-2xl border border-white/10 bg-white shadow-2xl dark:bg-slate-950" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="flex items-center gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-800">
+          <Icon name="command" className="h-5 w-5 text-blue-500" />
+          <input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} className="min-w-0 flex-1 bg-transparent text-sm font-medium text-slate-950 outline-none dark:text-white" placeholder="Search commands, reports, workflows..." />
+          <Button variant="quiet" className="min-h-8 px-2" onClick={onClose}><Icon name="close" /></Button>
+        </div>
+        <div className="max-h-80 overflow-y-auto p-2">
+          {filtered.map((action) => (
+            <button key={action.label} type="button" onClick={() => { action.run(); onClose(); }} className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-3 text-left text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-900">
+              <span>{action.label}</span>
+              <span className="shrink-0 text-xs text-slate-400">{action.hint}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const Heatmap = ({ data = [] }) => {
+  const map = new Map(data.map((item) => [`${item.day}-${item.hour}`, item]));
+  const max = Math.max(1, ...data.map((item) => item.count || 0));
+  return (
+    <div className="grid grid-cols-12 gap-1">
+      {Array.from({ length: 84 }).map((_, index) => {
+        const day = Math.floor(index / 12);
+        const hour = (index % 12) * 2;
+        const item = map.get(`${day}-${hour}`) || { count: 0 };
+        const opacity = item.count ? 0.18 + (item.count / max) * 0.72 : 0.08;
+        return <div key={`${day}-${hour}`} title={`${item.count || 0} transactions`} className="aspect-square rounded-md bg-blue-500" style={{ opacity }} />;
+      })}
+    </div>
+  );
+};
 
 const Home = () => {
   const { token } = useContext(AuthContext);
-  const [stats, setStats] = useState(null);
+  const { isOffline, isDegraded, refresh } = useBackendHealth();
+  const [dashboard, setDashboard] = useState(EMPTY_DASHBOARD);
   const [loading, setLoading] = useState(true);
-  const [recentTransactions, setRecentTransactions] = useState([]);
+  const [error, setError] = useState("");
+  const [darkMode, setDarkMode] = useState(() => window.localStorage.getItem("dashboard-theme") === "dark");
+  const [commandOpen, setCommandOpen] = useState(false);
+  const [widgetOrder, setWidgetOrder] = useState(["overview", "analytics", "ai", "transactions", "workflow"]);
   const [chartQuery, setChartQuery] = useState("");
   const [chartLoading, setChartLoading] = useState(false);
   const [chartData, setChartData] = useState(null);
   const [chartExplanation, setChartExplanation] = useState("");
-  const [showChartSection, setShowChartSection] = useState(true);
 
-  // Load dashboard data
   useEffect(() => {
-    if (token) {
-      loadDashboardData();
-    } else {
+    document.documentElement.classList.toggle("dark", darkMode);
+    window.localStorage.setItem("dashboard-theme", darkMode ? "dark" : "light");
+  }, [darkMode]);
+
+  const loadDashboard = useCallback(async () => {
+    if (!token) {
       setLoading(false);
+      return;
     }
-  }, [token]);
-
-  const loadDashboardData = async () => {
     setLoading(true);
+    setError("");
     try {
-      // Fetch stats
-      const statsResponse = await api.transactions.getStats();
-      setStats(statsResponse.data.summary);
+      if (isOffline) {
+        setError("Backend temporarily unavailable");
+        setLoading(false);
+        return;
+      }
 
-      // Fetch recent transactions (last 5)
-      const transactionsResponse = await api.transactions.getAll({ limit: 5 });
-      setRecentTransactions(transactionsResponse.data.transactions);
-    } catch (error) {
-      console.error("Error loading dashboard data:", error);
+      const response = await api.dashboard.overview();
+      setDashboard({ ...EMPTY_DASHBOARD, ...response.data });
+    } catch (loadError) {
+      const msg = loadError.response?.data?.message || loadError.message || "Unable to load dashboard.";
+      setError(msg);
     } finally {
       setLoading(false);
     }
-  };
+  }, [token, isOffline]);
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-    }).format(amount || 0);
-  };
+  useEffect(() => {
+    loadDashboard();
+  }, [loadDashboard]);
 
-  const formatDate = (date) => {
-    return new Date(date).toLocaleDateString();
-  };
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setCommandOpen(true);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
-  const COLORS = [
-    "#0088FE",
-    "#00C49F",
-    "#FFBB28",
-    "#FF8042",
-    "#8884D8",
-    "#82CA9D",
-    "#FFC658",
-    "#FF6B9D",
-    "#A28FD0",
-    "#E91E63",
+  const summary = dashboard.summary || EMPTY_DASHBOARD.summary;
+  const monthlyTrend = dashboard.monthlyTrend?.length ? dashboard.monthlyTrend : [
+    { month: "Jan", revenue: 0, expenses: 0, profit: 0, cashFlow: 0 },
+    { month: "Feb", revenue: 0, expenses: 0, profit: 0, cashFlow: 0 },
   ];
+  const miniTrend = monthlyTrend.map((item) => ({ value: item.profit || item.revenue || 0 }));
+  const categoryPie = (dashboard.topCategories || []).slice(0, 6);
+
+  const moveWidget = (id, direction) => {
+    setWidgetOrder((current) => {
+      const index = current.indexOf(id);
+      const nextIndex = index + direction;
+      if (index < 0 || nextIndex < 0 || nextIndex >= current.length) return current;
+      const next = [...current];
+      [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+      return next;
+    });
+  };
 
   const handleGenerateChart = async () => {
     if (!chartQuery.trim()) {
-      toast.error("Please enter a query");
+      toast.error("Enter a chart request first.");
       return;
     }
-
     setChartLoading(true);
     try {
       const response = await api.charts.generate({ query: chartQuery });
-
       setChartData(response.data.chartConfig);
       setChartExplanation(response.data.explanation);
-      toast.success("Chart generated successfully!");
-    } catch (error) {
-      // API interceptor handles user-facing error toast.
-      console.error("Error generating chart:", error);
+      toast.success("AI chart generated");
+    } catch (chartError) {
+      console.error("Chart generation failed:", chartError);
     } finally {
       setChartLoading(false);
     }
   };
 
-  const renderChart = () => {
-    if (!chartData) return null;
-
-    const commonProps = {
-      data: chartData.data,
-      margin: { top: 20, right: 30, left: 20, bottom: 5 },
-    };
-
-    switch (chartData.type) {
-      case "bar":
-        return (
-          <ResponsiveContainer width="100%" height={350}>
-            <BarChart {...commonProps}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis
-                dataKey={chartData.xKey}
-                angle={-45}
-                textAnchor="end"
-                height={80}
-              />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              {chartData.yKeys.map((key, index) => (
-                <Bar
-                  key={key}
-                  dataKey={key}
-                  fill={COLORS[index % COLORS.length]}
-                />
-              ))}
-            </BarChart>
-          </ResponsiveContainer>
-        );
-
-      case "line":
-        return (
-          <ResponsiveContainer width="100%" height={350}>
-            <LineChart {...commonProps}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey={chartData.xKey} />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              {chartData.yKeys.map((key, index) => (
-                <Line
-                  key={key}
-                  type="monotone"
-                  dataKey={key}
-                  stroke={COLORS[index % COLORS.length]}
-                  strokeWidth={2}
-                />
-              ))}
-            </LineChart>
-          </ResponsiveContainer>
-        );
-
-      case "area":
-        return (
-          <ResponsiveContainer width="100%" height={350}>
-            <AreaChart {...commonProps}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey={chartData.xKey} />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              {chartData.yKeys.map((key, index) => (
-                <Area
-                  key={key}
-                  type="monotone"
-                  dataKey={key}
-                  fill={COLORS[index % COLORS.length]}
-                  stroke={COLORS[index % COLORS.length]}
-                />
-              ))}
-            </AreaChart>
-          </ResponsiveContainer>
-        );
-
-      case "pie":
-      case "donut":
-        return (
-          <ResponsiveContainer width="100%" height={350}>
-            <PieChart>
-              <Pie
-                data={chartData.data}
-                dataKey={chartData.valueKey}
-                nameKey={chartData.nameKey}
-                cx="50%"
-                cy="50%"
-                innerRadius={chartData.type === "donut" ? 60 : 0}
-                outerRadius={100}
-                fill="#8884d8"
-                label
-              >
-                {chartData.data.map((entry, index) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill={COLORS[index % COLORS.length]}
-                  />
-                ))}
-              </Pie>
-              <Tooltip />
-              <Legend />
-            </PieChart>
-          </ResponsiveContainer>
-        );
-
-      case "composed":
-        return (
-          <ResponsiveContainer width="100%" height={350}>
-            <ComposedChart {...commonProps}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey={chartData.xKey} />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey={chartData.yKeys[0]} fill={COLORS[0]} />
-              <Line
-                type="monotone"
-                dataKey={chartData.yKeys[1]}
-                stroke={COLORS[1]}
-                strokeWidth={2}
-              />
-            </ComposedChart>
-          </ResponsiveContainer>
-        );
-
-      default:
-        return <p className="text-gray-500">Unsupported chart type</p>;
-    }
-  };
-
-  const features = [
-    {
-      icon: (
-        <svg
-          className="w-8 h-8"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-          />
-        </svg>
-      ),
-      title: "Smart Transactions",
-      description:
-        "Upload and manage your transactions with AI-powered categorization",
-      link: "/transactions",
-      color: "from-blue-500 to-blue-600",
-    },
-    {
-      icon: (
-        <svg
-          className="w-8 h-8"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"
-          />
-        </svg>
-      ),
-      title: "Analytics Dashboard",
-      description:
-        "Get insights into your financial data with powerful analytics",
-      link: "/transactions",
-      color: "from-purple-500 to-purple-600",
-    },
-    {
-      icon: (
-        <svg
-          className="w-8 h-8"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-          />
-        </svg>
-      ),
-      title: "AI Excel Generator",
-      description: "Create custom Excel sheets with natural language prompts",
-      link: "/ai-excel",
-      color: "from-green-500 to-green-600",
-    },
+  const actions = [
+    { label: "Refresh dashboard", hint: "R", run: loadDashboard },
+    { label: "Open transactions workspace", hint: "Ledger", run: () => { window.location.href = "/transactions"; } },
+    { label: "Open import center", hint: "Upload", run: () => { window.location.href = "/transactions"; } },
+    { label: "Generate report", hint: "AI", run: () => setChartQuery("Monthly income vs expenses") },
+    { label: darkMode ? "Switch to light mode" : "Switch to dark mode", hint: "Theme", run: () => setDarkMode(!darkMode) },
   ];
 
-  const dashboardStats =
-    token && stats
-      ? [
-          {
-            label: "Total Transactions",
-            value: stats.totalTransactions || 0,
-            icon: (
-              <svg
-                className="w-8 h-8 text-blue-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                />
-              </svg>
-            ),
-            color: "bg-blue-50 border-blue-200",
-          },
-          {
-            label: "Total Income",
-            value: formatCurrency(stats.totalIncome || 0),
-            icon: (
-              <svg
-                className="w-8 h-8 text-green-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-            ),
-            color: "bg-green-50 border-green-200",
-          },
-          {
-            label: "Total Expenses",
-            value: formatCurrency(stats.totalExpenses || 0),
-            icon: (
-              <svg
-                className="w-8 h-8 text-red-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
-                />
-              </svg>
-            ),
-            color: "bg-red-50 border-red-200",
-          },
-          {
-            label: "Net Balance",
-            value: formatCurrency(
-              (stats.totalIncome || 0) - (stats.totalExpenses || 0)
-            ),
-            icon: (
-              <svg
-                className="w-8 h-8 text-purple-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"
-                />
-              </svg>
-            ),
-            color: "bg-purple-50 border-purple-200",
-          },
-        ]
-      : [
-          {
-            label: "Transactions",
-            value: "1,234",
-            icon: (
-              <svg
-                className="w-8 h-8 text-blue-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                />
-              </svg>
-            ),
-            color: "bg-blue-50 border-blue-200",
-          },
-          {
-            label: "Categories",
-            value: "12",
-            icon: (
-              <svg
-                className="w-8 h-8 text-purple-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
-                />
-              </svg>
-            ),
-            color: "bg-purple-50 border-purple-200",
-          },
-          {
-            label: "Reports",
-            value: "45",
-            icon: (
-              <svg
-                className="w-8 h-8 text-green-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                />
-              </svg>
-            ),
-            color: "bg-green-50 border-green-200",
-          },
-          {
-            label: "Accuracy",
-            value: "98%",
-            icon: (
-              <svg
-                className="w-8 h-8 text-yellow-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-            ),
-            color: "bg-yellow-50 border-yellow-200",
-          },
-        ];
+  const renderAiChart = () => {
+    if (!chartData) return null;
+    if (chartData.type === "pie" || chartData.type === "donut") {
+      return (
+        <ResponsiveContainer width="100%" height={300}>
+          <PieChart>
+            <Pie data={chartData.data} dataKey={chartData.valueKey} nameKey={chartData.nameKey} innerRadius={chartData.type === "donut" ? 64 : 0} outerRadius={102}>
+              {chartData.data.map((_, index) => <Cell key={index} fill={["#2563eb", "#10b981", "#f04438", "#f59e0b", "#7c3aed", "#06b6d4"][index % 6]} />)}
+            </Pie>
+            <Tooltip formatter={(value) => formatMoney(value)} />
+          </PieChart>
+        </ResponsiveContainer>
+      );
+    }
+    return (
+      <ResponsiveContainer width="100%" height={300}>
+        <BarChart data={chartData.data}>
+          <CartesianGrid vertical={false} stroke="rgba(148,163,184,.22)" />
+          <XAxis dataKey={chartData.xKey} tickLine={false} axisLine={false} fontSize={11} />
+          <YAxis tickLine={false} axisLine={false} fontSize={11} />
+          <Tooltip />
+          {(chartData.yKeys || []).map((key, index) => <Bar key={key} dataKey={key} fill={["#2563eb", "#10b981", "#f04438"][index % 3]} radius={[6, 6, 0, 0]} />)}
+        </BarChart>
+      </ResponsiveContainer>
+    );
+  };
 
-  return (
-    <div className="min-h-screen ui-shell">
-      <Helmet>
-        <title>Home - AI Accountant</title>
-      </Helmet>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="text-center mb-16">
-          <h1 className="text-5xl md:text-6xl font-extrabold text-gray-900 mb-6">
-            Welcome to{" "}
-            <span className="block mt-3 text-[color:var(--ui-accent)] drop-shadow-sm">
-              AI Accountant
-            </span>
-          </h1>
-          <p className="text-xl text-[color:var(--ui-ink-2)] max-w-2xl mx-auto">
-            Manage your finances smarter with AI-powered accounting tools
-          </p>
-        </div>
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-16">
-          {loading && token ? (
-            <div className="col-span-2 md:col-span-4 text-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[color:var(--ui-accent)] mx-auto"></div>
-              <p className="mt-4 text-[color:var(--ui-ink-2)]">
-                Loading your dashboard...
-              </p>
+  const widgets = {
+    overview: (
+      <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard label="Total revenue" value={formatMoney(summary.revenue)} change={summary.monthlyGrowth} detail="Compared with previous month" tone="green" trend={miniTrend} />
+        <MetricCard label="Total expenses" value={formatMoney(summary.expenses)} change={summary.previousExpenses ? ((summary.currentExpenses - summary.previousExpenses) / summary.previousExpenses) * 100 : 0} detail="Current spend pressure" tone="red" trend={monthlyTrend.map((item) => ({ value: item.expenses }))} />
+        <MetricCard label="Net profit" value={formatMoney(summary.netProfit)} change={summary.previousProfit ? ((summary.currentProfit - summary.previousProfit) / Math.abs(summary.previousProfit || 1)) * 100 : 0} detail={`${percent.format(summary.profitMargin)}% profit margin`} tone="blue" trend={monthlyTrend.map((item) => ({ value: item.profit }))} />
+        <MetricCard label="Cash flow" value={formatMoney(summary.cashFlow)} change={summary.monthlyGrowth} detail={`${summary.runway ? `${percent.format(summary.runway)} months runway` : "Runway unavailable"}`} tone="slate" trend={monthlyTrend.map((item) => ({ value: item.cashFlow }))} />
+      </div>
+    ),
+    analytics: (
+      <div className="grid min-w-0 gap-4 2xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,.75fr)]">
+        <Panel className="p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[.14em] text-slate-500 dark:text-slate-400">Financial analytics</p>
+              <h2 className="mt-1 text-lg font-semibold text-slate-950 dark:text-white">Revenue, expenses, and profit</h2>
             </div>
-          ) : (
-            dashboardStats.map((stat, index) => (
-              <div
-                key={index}
-                className="ui-card p-6 hover:shadow-xl transition-shadow duration-300"
-              >
-                <div className="text-center">
-                  <div className="flex justify-center mb-3">{stat.icon}</div>
-                  <div className="text-3xl font-bold text-gray-900 mb-1">
-                    {stat.value}
-                  </div>
-                  <div className="text-sm text-gray-600">{stat.label}</div>
-                </div>
+            <Pill tone="blue">12 month trend</Pill>
+          </div>
+          <div className="mt-4 h-80 min-h-0">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={monthlyTrend}>
+                <defs>
+                  <linearGradient id="revenue" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#10b981" stopOpacity={0.22}/><stop offset="95%" stopColor="#10b981" stopOpacity={0}/></linearGradient>
+                  <linearGradient id="expenses" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#f04438" stopOpacity={0.18}/><stop offset="95%" stopColor="#f04438" stopOpacity={0}/></linearGradient>
+                </defs>
+                <CartesianGrid vertical={false} stroke="rgba(148,163,184,.22)" />
+                <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={11} />
+                <YAxis tickLine={false} axisLine={false} fontSize={11} tickFormatter={formatCompact} />
+                <Tooltip formatter={(value) => formatMoney(value)} />
+                <Area type="monotone" dataKey="revenue" stroke="#10b981" fill="url(#revenue)" strokeWidth={2} />
+                <Area type="monotone" dataKey="expenses" stroke="#f04438" fill="url(#expenses)" strokeWidth={2} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </Panel>
+
+        <Panel className="p-4">
+          <p className="text-xs font-bold uppercase tracking-[.14em] text-slate-500 dark:text-slate-400">Expense breakdown</p>
+          <h2 className="mt-1 text-lg font-semibold text-slate-950 dark:text-white">Top categories</h2>
+          <div className="mt-4 h-56">
+            {categoryPie.length ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={categoryPie} dataKey="amount" nameKey="category" innerRadius={58} outerRadius={86} paddingAngle={3}>
+                    {categoryPie.map((_, index) => <Cell key={index} fill={["#2563eb", "#10b981", "#f04438", "#f59e0b", "#7c3aed", "#06b6d4"][index % 6]} />)}
+                  </Pie>
+                  <Tooltip formatter={(value) => formatMoney(value)} />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="grid h-full place-items-center rounded-2xl border border-dashed border-slate-300 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                Import transactions to build category analytics.
               </div>
-            ))
-          )}
-        </div>
-
-        {/* AI Chart Generator */}
-        {token && !loading && (
-          <div className="mb-16 ui-card p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center">
-                <svg
-                  className="w-6 h-6 text-[color:var(--ui-accent)] mr-3"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                  />
-                </svg>
-                <h2 className="text-2xl font-bold text-gray-900">
-                  AI Chart Generator
-                </h2>
-              </div>
-              <button
-                onClick={() => setShowChartSection(!showChartSection)}
-                className="text-[color:var(--ui-ink-2)] hover:text-[color:var(--ui-ink)]"
-              >
-                <svg
-                  className={`w-5 h-5 transition-transform ${
-                    showChartSection ? "rotate-180" : ""
-                  }`}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 9l-7 7-7-7"
-                  />
-                </svg>
-              </button>
-            </div>
-
-            {showChartSection && (
-              <>
-                <p className="text-[color:var(--ui-ink-2)] mb-4">
-                  Ask any question and get an interactive chart with AI insights
-                </p>
-
-                {/* Input */}
-                <div className="mb-4">
-                  <div className="flex gap-3">
-                    <input
-                      type="text"
-                      value={chartQuery}
-                      onChange={(e) => setChartQuery(e.target.value)}
-                      onKeyPress={(e) =>
-                        e.key === "Enter" && handleGenerateChart()
-                      }
-                      placeholder="e.g., Show monthly expenses as a bar chart, Top 10 categories as donut chart"
-                      className="flex-1 ui-input"
-                      disabled={chartLoading}
-                    />
-                    <button
-                      onClick={handleGenerateChart}
-                      disabled={chartLoading}
-                      className="ui-btn px-6 py-3 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2 text-white cursor-pointer"
-                    >
-                      {chartLoading ? (
-                        <>
-                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                          Generating...
-                        </>
-                      ) : (
-                        <>
-                          <svg
-                            className="w-5 h-5"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                            />
-                          </svg>
-                          Generate
-                        </>
-                      )}
-                    </button>
-                  </div>
-
-                  {/* Example Queries */}
-                  <div className="mt-3">
-                    <p className="text-xs text-gray-500 mb-2">Try these:</p>
-                    <div className="flex flex-wrap gap-2">
-                      {[
-                        "Monthly income vs expenses",
-                        "Top 10 categories as donut chart",
-                        "Income trend last 6 months",
-                        "Q1 vs Q2 vs Q3 vs Q4 comparison",
-                      ].map((example, index) => (
-                        <button
-                          key={index}
-                          onClick={() => setChartQuery(example)}
-                          className="text-xs px-3 py-1 rounded-full transition-colors border border-[color:rgba(0,173,181,0.25)] bg-[color:rgba(0,173,181,0.10)] text-[color:var(--ui-ink)] hover:bg-[color:rgba(0,173,181,0.14)]"
-                        >
-                          {example}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Chart Display */}
-                {chartData && (
-                  <div className="mt-6">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-3">
-                      {chartData.title}
-                    </h3>
-                    <div className="bg-[color:var(--ui-surface-2)] border border-[color:var(--ui-border)] rounded-xl p-4">
-                      {renderChart()}
-                    </div>
-                  </div>
-                )}
-
-                {/* Explanation */}
-                {chartExplanation && (
-                  <div className="mt-4 bg-[color:rgba(0,173,181,0.08)] border border-[color:rgba(0,173,181,0.22)] rounded-xl p-4">
-                    <h4 className="text-sm font-semibold text-gray-800 mb-2 flex items-center">
-                      <svg
-                        className="w-4 h-4 mr-2 text-[color:var(--ui-accent)]"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                        />
-                      </svg>
-                      AI Insights
-                    </h4>
-                    <p className="text-sm text-gray-700">{chartExplanation}</p>
-                  </div>
-                )}
-              </>
             )}
           </div>
-        )}
-
-        {/* Recent Transactions (only show if logged in) */}
-        {token && !loading && recentTransactions.length > 0 && (
-          <div className="mb-16 ui-card p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">
-                Recent Transactions
-              </h2>
-              <Link
-                to="/transactions"
-                className="text-[color:var(--ui-accent)] hover:opacity-90 font-semibold flex items-center"
-              >
-                View all
-                <svg
-                  className="w-5 h-5 ml-1"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 5l7 7-7 7"
-                  />
-                </svg>
-              </Link>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-[color:var(--ui-border)]">
-                <thead>
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-[color:var(--ui-ink-2)] uppercase tracking-wider">
-                      Date
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-[color:var(--ui-ink-2)] uppercase tracking-wider">
-                      Description
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-[color:var(--ui-ink-2)] uppercase tracking-wider">
-                      Category
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-[color:var(--ui-ink-2)] uppercase tracking-wider">
-                      Amount
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[color:var(--ui-border)]">
-                  {recentTransactions.map((transaction) => (
-                    <tr
-                      key={transaction._id}
-                      className="hover:bg-[color:rgba(0,173,181,0.06)] transition-colors"
-                    >
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-[color:var(--ui-ink)]">
-                        {formatDate(transaction.date)}
-                      </td>
-                      <td className="px-4 py-4 text-sm text-[color:var(--ui-ink)] max-w-xs truncate">
-                        {transaction.desc}
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-[color:var(--ui-ink-2)]">
-                        {transaction.category}
-                      </td>
-                      <td
-                        className={`px-4 py-4 whitespace-nowrap text-sm font-medium text-right ${
-                          transaction.type === "income"
-                            ? "text-green-600"
-                            : "text-red-600"
-                        }`}
-                      >
-                        {transaction.type === "income" ? "+" : "-"}
-                        {formatCurrency(transaction.amount)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* Features Grid */}
-        <div className="mb-16">
-          <h2 className="text-3xl font-bold text-[color:var(--ui-ink)] text-center mb-12">
-            What You Can Do
-          </h2>
-          <div className="grid md:grid-cols-3 gap-8">
-            {features.map((feature, index) => (
-              <Link
-                key={index}
-                to={feature.link}
-                className="group ui-card p-8 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2"
-              >
-                <div className="inline-flex p-4 rounded-xl bg-[color:rgba(0,173,181,0.14)] border border-[color:rgba(0,173,181,0.22)] text-[color:var(--ui-accent)] mb-6 group-hover:scale-110 transition-transform duration-300">
-                  {feature.icon}
-                </div>
-                <h3 className="text-2xl font-bold text-[color:var(--ui-ink)] mb-3">
-                  {feature.title}
-                </h3>
-                <p className="text-[color:var(--ui-ink-2)] mb-4">
-                  {feature.description}
-                </p>
-                <div className="flex items-center text-[color:var(--ui-accent)] font-semibold transition-opacity group-hover:opacity-90">
-                  Get started
-                  <svg
-                    className="w-5 h-5 ml-2 group-hover:translate-x-2 transition-transform"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M13 7l5 5m0 0l-5 5m5-5H6"
-                    />
-                  </svg>
-                </div>
-              </Link>
+          <div className="mt-3 space-y-2">
+            {categoryPie.slice(0, 5).map((item) => (
+              <div key={item.category} className="flex items-center justify-between gap-3 text-sm">
+                <span className="min-w-0 truncate font-medium text-slate-700 dark:text-slate-200">{item.category}</span>
+                <span className="shrink-0 text-slate-500">{formatMoney(item.amount)}</span>
+              </div>
             ))}
           </div>
-        </div>
+        </Panel>
+      </div>
+    ),
+    ai: (
+      <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,.85fr)_minmax(0,1.15fr)]">
+        <Panel className="p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[.14em] text-slate-500 dark:text-slate-400">AI finance copilot</p>
+              <h2 className="mt-1 text-lg font-semibold text-slate-950 dark:text-white">Executive insights</h2>
+            </div>
+            <Pill tone="blue"><Icon name="spark" /> AI</Pill>
+          </div>
+          <div className="mt-4 space-y-3">
+            {(dashboard.insights || []).map((insight) => (
+              <div key={insight.title} className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900">
+                <div className="flex items-start gap-3">
+                  <span className={cn("mt-1 h-2.5 w-2.5 shrink-0 rounded-full", insight.type === "warning" ? "bg-amber-500" : insight.type === "positive" ? "bg-emerald-500" : "bg-blue-500")} />
+                  <div className="min-w-0">
+                    <p className="font-semibold text-slate-950 dark:text-white">{insight.title}</p>
+                    <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">{insight.text}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Panel>
 
-        {/* CTA Section */}
-        <div className="rounded-3xl shadow-2xl p-8 md:p-12 text-[color:var(--ui-bg)] bg-[linear-gradient(135deg,#222831_0%,#393E46_70%)] border border-[color:rgba(0,173,181,0.25)]">
-          <div className="max-w-3xl mx-auto text-center">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Ready to Get Started?
-            </h2>
-            <p className="text-lg mb-8 text-[color:rgba(238,238,238,0.85)]">
-              Upload your financial documents and let AI do the heavy lifting
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link
-                to="/transactions"
-                className="bg-[color:var(--ui-accent)] text-[color:var(--ui-ink)] px-8 py-4 rounded-xl font-semibold hover:opacity-90 transition-opacity duration-200 shadow-lg"
-              >
-                View Transactions
-              </Link>
-              <Link
-                to="/box-calculator"
-                className="bg-transparent border-2 border-[color:var(--ui-accent)] text-[color:var(--ui-bg)] px-8 py-4 rounded-xl font-semibold hover:bg-[color:rgba(0,173,181,0.12)] transition-all duration-200"
-              >
-                Calculate Boxes
-              </Link>
+        <Panel className="p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[.14em] text-slate-500 dark:text-slate-400">Natural-language BI</p>
+              <h2 className="mt-1 text-lg font-semibold text-slate-950 dark:text-white">Ask for a chart</h2>
             </div>
           </div>
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+            <input value={chartQuery} onChange={(event) => setChartQuery(event.target.value)} onKeyDown={(event) => event.key === "Enter" && handleGenerateChart()} className="min-h-11 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium outline-none focus:border-blue-300 focus:ring-4 focus:ring-blue-500/10 dark:border-slate-800 dark:bg-slate-950 dark:text-white" placeholder="Example: monthly income vs expenses" />
+            <Button variant="primary" onClick={handleGenerateChart} disabled={chartLoading}>{chartLoading ? "Generating..." : "Generate"}</Button>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {["Monthly income vs expenses", "Top vendors by spend", "Expense trend by category"].map((query) => <Button key={query} className="min-h-8 px-2.5 text-xs" onClick={() => setChartQuery(query)}>{query}</Button>)}
+          </div>
+          {chartData ? <div className="mt-4">{renderAiChart()}</div> : <div className="mt-4 grid h-64 place-items-center rounded-2xl border border-dashed border-slate-300 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">AI-generated chart output appears here.</div>}
+          {chartExplanation ? <p className="mt-3 rounded-2xl bg-blue-50 p-3 text-sm leading-6 text-slate-700 dark:bg-blue-400/10 dark:text-slate-200">{chartExplanation}</p> : null}
+        </Panel>
+      </div>
+    ),
+    transactions: (
+      <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <Panel className="overflow-hidden">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 p-4 dark:border-slate-800">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[.14em] text-slate-500 dark:text-slate-400">Transactions</p>
+              <h2 className="mt-1 text-lg font-semibold text-slate-950 dark:text-white">Recent ledger activity</h2>
+            </div>
+            <Link to="/transactions"><Button variant="primary">Open workspace <Icon name="arrow" /></Button></Link>
+          </div>
+          <div className="divide-y divide-slate-100 dark:divide-slate-800">
+            {(dashboard.recentTransactions || []).slice(0, 8).map((transaction) => (
+              <div key={transaction._id || `${transaction.date}-${transaction.desc}`} className="grid gap-3 p-4 sm:grid-cols-[minmax(0,1fr)_120px_110px] sm:items-center">
+                <div className="min-w-0">
+                  <p className="truncate font-semibold text-slate-950 dark:text-white">{transaction.desc}</p>
+                  <p className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">{new Date(transaction.date).toLocaleDateString()} · {transaction.category || "Uncategorized"} · {transaction.vendor || "No vendor"}</p>
+                </div>
+                <Pill tone={transaction.status === "approved" ? "green" : ["pending", "needs_review"].includes(transaction.status) ? "amber" : "neutral"}>{String(transaction.status || "pending").replaceAll("_", " ")}</Pill>
+                <p className={cn("font-semibold sm:text-right", transaction.type === "income" ? "text-emerald-600" : "text-red-600")}>{transaction.type === "income" ? "+" : "-"}{formatMoney(transaction.amount)}</p>
+              </div>
+            ))}
+            {!dashboard.recentTransactions?.length ? <div className="p-6 text-center text-sm text-slate-500 dark:text-slate-400">No transactions yet. Import a workbook to activate the dashboard.</div> : null}
+          </div>
+        </Panel>
+
+        <Panel className="p-4">
+          <p className="text-xs font-bold uppercase tracking-[.14em] text-slate-500 dark:text-slate-400">Review queue</p>
+          <h2 className="mt-1 text-lg font-semibold text-slate-950 dark:text-white">Risk and reconciliation</h2>
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <div className="rounded-2xl bg-slate-50 p-3 dark:bg-slate-900"><p className="text-xs text-slate-500">Pending</p><p className="mt-1 text-2xl font-semibold">{formatCompact(dashboard.workflow?.approvals || 0)}</p></div>
+            <div className="rounded-2xl bg-slate-50 p-3 dark:bg-slate-900"><p className="text-xs text-slate-500">Duplicates</p><p className="mt-1 text-2xl font-semibold">{formatCompact(dashboard.workflow?.duplicateCount || 0)}</p></div>
+          </div>
+          <div className="mt-4 space-y-2">
+            {(dashboard.suspicious || []).slice(0, 4).map((item) => (
+              <div key={item._id || item.desc} className="rounded-2xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-400/25 dark:bg-amber-400/10">
+                <p className="truncate text-sm font-semibold text-slate-950 dark:text-white">{item.desc}</p>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{formatMoney(item.amount)} · {item.category}</p>
+              </div>
+            ))}
+          </div>
+        </Panel>
+      </div>
+    ),
+    workflow: (
+      <div className="grid min-w-0 gap-4 xl:grid-cols-4">
+        <Panel className="p-4">
+          <p className="text-xs font-bold uppercase tracking-[.14em] text-slate-500 dark:text-slate-400">Tax center</p>
+          <p className="mt-2 text-3xl font-semibold text-slate-950 dark:text-white">{formatMoney(summary.taxEstimate)}</p>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Estimated reserve from current profit</p>
+        </Panel>
+        <Panel className="p-4">
+          <p className="text-xs font-bold uppercase tracking-[.14em] text-slate-500 dark:text-slate-400">Budget usage</p>
+          <p className="mt-2 text-3xl font-semibold text-slate-950 dark:text-white">{percent.format(summary.budgetUsage)}%</p>
+          <div className="mt-3 h-2 rounded-full bg-slate-100 dark:bg-slate-800"><div className="h-full rounded-full bg-blue-500" style={{ width: `${Math.min(100, summary.budgetUsage || 0)}%` }} /></div>
+        </Panel>
+        <Panel className="p-4">
+          <p className="text-xs font-bold uppercase tracking-[.14em] text-slate-500 dark:text-slate-400">Payroll overview</p>
+          <p className="mt-2 text-3xl font-semibold text-slate-950 dark:text-white">{formatMoney(summary.payrollEstimate)}</p>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Estimated payroll allocation</p>
+        </Panel>
+        <Panel className="p-4">
+          <p className="text-xs font-bold uppercase tracking-[.14em] text-slate-500 dark:text-slate-400">Bank balances</p>
+          <p className="mt-2 text-3xl font-semibold text-slate-950 dark:text-white">{formatMoney(summary.bankBalance)}</p>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Modeled cash position</p>
+        </Panel>
+        <Panel className="p-4 xl:col-span-2">
+          <p className="text-xs font-bold uppercase tracking-[.14em] text-slate-500 dark:text-slate-400">Activity heatmap</p>
+          <h2 className="mt-1 text-lg font-semibold text-slate-950 dark:text-white">Transaction density</h2>
+          <div className="mt-4"><Heatmap data={dashboard.heatmap} /></div>
+        </Panel>
+        <Panel className="p-4 xl:col-span-2">
+          <p className="text-xs font-bold uppercase tracking-[.14em] text-slate-500 dark:text-slate-400">Close workflow</p>
+          <h2 className="mt-1 text-lg font-semibold text-slate-950 dark:text-white">Tasks and reminders</h2>
+          <div className="mt-4 grid gap-2 sm:grid-cols-2">
+            {dashboard.workflow?.tasks?.map((task) => <div key={task.title} className="rounded-2xl bg-slate-50 p-3 dark:bg-slate-900"><p className="font-semibold">{task.title}</p><p className="mt-1 text-sm text-slate-500">{formatCompact(task.count)} items</p></div>)}
+            {dashboard.workflow?.reminders?.map((reminder) => <div key={reminder.title} className="rounded-2xl border border-slate-200 p-3 dark:border-slate-800"><p className="font-semibold">{reminder.title}</p><p className="mt-1 text-sm text-slate-500">{reminder.due} · {reminder.priority}</p></div>)}
+          </div>
+        </Panel>
+      </div>
+    ),
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-full bg-[#f6f8fb] p-4 dark:bg-slate-950">
+        <div className="mx-auto max-w-[1680px] space-y-4">
+          <Skeleton className="h-36" />
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><Skeleton className="h-40" /><Skeleton className="h-40" /><Skeleton className="h-40" /><Skeleton className="h-40" /></div>
+          <Skeleton className="h-96" />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={cn(darkMode ? "dark" : "", "min-h-full w-full max-w-full overflow-x-hidden bg-[#f6f8fb] text-slate-950 dark:bg-slate-950 dark:text-slate-100")}>
+      <Helmet><title>Dashboard - AI Accountant</title></Helmet>
+      <div className="mx-auto flex w-full max-w-[1680px] flex-col gap-4 px-3 py-4 sm:px-5 lg:px-6">
+        {isOffline ? (
+          <Panel className="border-amber-200 bg-amber-50 p-3 text-sm text-amber-700 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200">
+            Backend temporarily unavailable — showing cached data where available. <button type="button" onClick={() => refresh()} className="ml-3 underline">Retry connection</button>
+          </Panel>
+        ) : isDegraded ? (
+          <Panel className="border-amber-200 bg-amber-50 p-3 text-sm text-amber-700 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200">
+            Backend responding slowly — some features may be degraded.
+          </Panel>
+        ) : null}
+
+        <header className="sticky top-0 z-30 rounded-2xl border border-slate-200 bg-white/92 p-4 shadow-[0_12px_34px_rgba(15,23,42,.08)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/92">
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(360px,.8fr)] xl:items-center">
+            <div className="min-w-0">
+              <div className="flex flex-wrap gap-2">
+                <Pill tone="blue">AI finance OS</Pill>
+                <Pill>{formatCompact(summary.totalTransactions)} transactions</Pill>
+                <Pill tone={summary.netProfit >= 0 ? "green" : "red"}>{formatMoney(summary.netProfit)} net profit</Pill>
+              </div>
+              <h1 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950 dark:text-white sm:text-3xl">Executive finance dashboard</h1>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500 dark:text-slate-400">A premium AI-powered workspace for cash visibility, close workflows, anomaly detection, forecasting, and accounting operations.</p>
+            </div>
+            <div className="flex min-w-0 flex-col gap-2">
+              <div className="flex min-w-0 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+                <Icon name="search" className="h-5 w-5 shrink-0 text-slate-400" />
+                <input className="min-w-0 flex-1 bg-transparent text-sm font-medium outline-none dark:text-white" placeholder="Search dashboard, reports, actions..." onFocus={() => setCommandOpen(true)} />
+                <span className="hidden rounded-lg border border-slate-200 px-2 py-1 text-xs font-bold text-slate-400 sm:block dark:border-slate-800">Ctrl K</span>
+              </div>
+              <div className="flex flex-wrap justify-start gap-2 xl:justify-end">
+                <Button onClick={loadDashboard}>Refresh</Button>
+                <Button onClick={() => setDarkMode(!darkMode)}>{darkMode ? "Light" : "Dark"}</Button>
+                <Link to="/transactions"><Button variant="primary"><Icon name="upload" /> Import / review</Button></Link>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {error ? <Panel className="border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-400/30 dark:bg-red-400/10 dark:text-red-200">{error}</Panel> : null}
+
+        <div className="flex flex-wrap gap-2">
+          {widgetOrder.map((id, index) => (
+            <div key={id} className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-500 dark:border-slate-800 dark:bg-slate-950">
+              <span className="capitalize">{id}</span>
+              <button type="button" onClick={() => moveWidget(id, -1)} disabled={index === 0} className="px-1 disabled:opacity-30">↑</button>
+              <button type="button" onClick={() => moveWidget(id, 1)} disabled={index === widgetOrder.length - 1} className="px-1 disabled:opacity-30">↓</button>
+            </div>
+          ))}
         </div>
 
-        {token && (
-          <div className="mt-8 text-center">
-            <p className="text-sm text-[color:var(--ui-ink-2)] flex items-center justify-center">
-              <svg
-                className="w-4 h-4 mr-2 text-[color:var(--ui-accent)]"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                  clipRule="evenodd"
-                />
-              </svg>
-              Your session is active and secure
-            </p>
-          </div>
-        )}
+        {widgetOrder.map((id) => <React.Fragment key={id}>{widgets[id]}</React.Fragment>)}
       </div>
+      <CommandPalette open={commandOpen} onClose={() => setCommandOpen(false)} actions={actions} />
     </div>
   );
 };

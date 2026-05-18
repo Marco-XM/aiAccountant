@@ -11,14 +11,15 @@ const JWT_SECRET = process.env.JWT_SECRET;
 const authMiddleware = (req, res, next) => {
   try {
     const authHeader = req.header("Authorization");
+    const queryToken = req.query?.token;
+    const bearerToken = authHeader ? authHeader.replace("Bearer ", "") : "";
+    const token = bearerToken || queryToken;
 
-    if (!authHeader) {
+    if (!authHeader && !queryToken) {
       return res
         .status(401)
         .json({ message: "Access Denied. No authorization header provided." });
     }
-
-    const token = authHeader.replace("Bearer ", "");
 
     if (!token) {
       return res

@@ -73,12 +73,34 @@ const transactionSchema = new mongoose.Schema({
     // Status and metadata
     status: {
         type: String,
-        enum: ['pending', 'approved', 'rejected', 'needs_review'],
+        enum: ['pending', 'approved', 'rejected', 'needs_review', 'reconciled', 'flagged'],
         default: 'pending'
     },
     isReconciled: {
         type: Boolean,
         default: false
+    },
+    tags: [{
+        type: String,
+        trim: true
+    }],
+    duplicateHash: {
+        type: String
+    },
+    importJobId: {
+        type: String
+    },
+    source: {
+        type: String
+    },
+    importSheet: {
+        type: String
+    },
+    importRow: {
+        type: Number
+    },
+    rawData: {
+        type: mongoose.Schema.Types.Mixed
     },
     
     // User association
@@ -96,10 +118,16 @@ const transactionSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 // Index for better query performance
+transactionSchema.index({ userId: 1, date: -1, _id: -1 });
+transactionSchema.index({ userId: 1, status: 1, date: -1 });
+transactionSchema.index({ userId: 1, type: 1, date: -1 });
+transactionSchema.index({ userId: 1, category: 1, date: -1 });
+transactionSchema.index({ userId: 1, duplicateHash: 1 });
+transactionSchema.index({ userId: 1, importJobId: 1 });
+transactionSchema.index({ userId: 1, desc: 'text', vendor: 'text', category: 'text', reference: 'text' });
 transactionSchema.index({ userId: 1, createdAt: -1 });
 transactionSchema.index({ transactionId: 1 });
 transactionSchema.index({ category: 1 });
-transactionSchema.index({ status: 1 });
 
 // Generate unique transaction ID if not provided
 transactionSchema.pre('save', async function(next) {

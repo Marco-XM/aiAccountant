@@ -7,4 +7,11 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  // Ensure worker bundles use ES modules to allow code-splitting inside workers
+  worker: {
+    format: 'es'
+  },
+  build: {
+    // keep default build settings
+  }
 })

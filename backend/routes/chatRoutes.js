@@ -2,10 +2,19 @@ const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../middleware/auth.mw');
 const Chat = require('../models/Chat');
+const mongoose = require('mongoose');
+const { isMongoObjectId } = require('../services/userIdentity');
+
+const isDatabaseReady = () => mongoose.connection.readyState === 1;
+const canUseMongoChat = (userId) => isDatabaseReady() && isMongoObjectId(userId);
 
 // Get all chat sessions for user
 router.get('/sessions', authMiddleware, async (req, res) => {
   try {
+    if (!canUseMongoChat(req.user._id)) {
+      return res.json([]);
+    }
+
     const chats = await Chat.find({ userId: req.user._id })
       .sort({ updatedAt: -1 })
       .select('title createdAt updatedAt messages')
@@ -21,6 +30,10 @@ router.get('/sessions', authMiddleware, async (req, res) => {
 // Get a specific chat session
 router.get('/sessions/:id', authMiddleware, async (req, res) => {
   try {
+    if (!canUseMongoChat(req.user._id)) {
+      return res.status(404).json({ error: 'Chat not found' });
+    }
+
     const chat = await Chat.findOne({ 
       _id: req.params.id, 
       userId: req.user._id 
@@ -40,6 +53,10 @@ router.get('/sessions/:id', authMiddleware, async (req, res) => {
 // Create new chat session
 router.post('/sessions', authMiddleware, async (req, res) => {
   try {
+    if (!canUseMongoChat(req.user._id)) {
+      return res.status(503).json({ error: 'Chat sessions require a MongoDB-backed user account' });
+    }
+
     const { title } = req.body;
     
     const chat = new Chat({
@@ -59,6 +76,10 @@ router.post('/sessions', authMiddleware, async (req, res) => {
 // Update chat session (save messages)
 router.put('/sessions/:id', authMiddleware, async (req, res) => {
   try {
+    if (!canUseMongoChat(req.user._id)) {
+      return res.status(503).json({ error: 'Chat sessions require a MongoDB-backed user account' });
+    }
+
     const { messages, title, suggestedQuestions } = req.body;
     
     const chat = await Chat.findOne({ 
@@ -85,6 +106,10 @@ router.put('/sessions/:id', authMiddleware, async (req, res) => {
 // Delete chat session
 router.delete('/sessions/:id', authMiddleware, async (req, res) => {
   try {
+    if (!canUseMongoChat(req.user._id)) {
+      return res.status(503).json({ error: 'Chat sessions require a MongoDB-backed user account' });
+    }
+
     const chat = await Chat.findOneAndDelete({ 
       _id: req.params.id, 
       userId: req.user._id 

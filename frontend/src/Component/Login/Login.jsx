@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import toast from "react-hot-toast";
 import { Link, useNavigate } from "react-router-dom";
 import { AuthContext } from "../../Context/AuthContext";
-import { Helmet } from "react-helmet";
+import { Helmet } from "../../components/Head/Helmet";
 import { api } from "../../config/api";
 
 const Login = () => {
