@@ -136,18 +136,21 @@ app.use("/api", (req, res, next) => {
   apiLimiter(req, res, next);
 });
 
+// Helper for Vercel bundled modules where module.exports might be exported as { default: router }
+const resolveRouter = (m) => (m && m.default && typeof m.default === 'function') ? m.default : m;
+
 // Use Routes
-app.use("/api/auth", authRoutes);
-app.use("/api", geminiRoutes);
-app.use("/api/excel", excelEditorRoutes);
-app.use("/api/excel", excelRoutes);
-app.use("/api/transactions", transactionRoutes);
-app.use("/api/dashboard", dashboardRoutes);
-app.use("/api/ai-excel", aiExcelRoutes);
-app.use("/api/chatbot", chatbotRoutes);
-app.use("/api/chat", chatRoutes);
-app.use("/api/charts", chartRoutes);
-app.use("/api/ai-charts", aiChartsRoutes);
+app.use("/api/auth", resolveRouter(authRoutes));
+app.use("/api", resolveRouter(geminiRoutes));
+app.use("/api/excel", resolveRouter(excelEditorRoutes));
+app.use("/api/excel", resolveRouter(excelRoutes));
+app.use("/api/transactions", resolveRouter(transactionRoutes));
+app.use("/api/dashboard", resolveRouter(dashboardRoutes));
+app.use("/api/ai-excel", resolveRouter(aiExcelRoutes));
+app.use("/api/chatbot", resolveRouter(chatbotRoutes));
+app.use("/api/chat", resolveRouter(chatRoutes));
+app.use("/api/charts", resolveRouter(chartRoutes));
+app.use("/api/ai-charts", resolveRouter(aiChartsRoutes));
 
 app.get("/", (req, res) => {
   res.send("Backend is Working Correctly");
