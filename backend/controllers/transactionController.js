@@ -52,12 +52,11 @@ const genAI = new GoogleGenerativeAI(
   process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY,
 );
 
+const os = require('os');
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadDir = path.join(__dirname, "../uploads");
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
+    // In Vercel, only /tmp is writable
+    const uploadDir = os.tmpdir();
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
