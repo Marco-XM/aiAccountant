@@ -9,6 +9,7 @@ const XLSX = require("xlsx");
 const pdfParse = require("pdf-parse");
 const Transaction = require("../models/Transaction");
 const localTransactionStore = require("../services/localTransactionStore");
+const usageService = require("../services/usageService");
 const { isMongoObjectId } = require("../services/userIdentity");
 
 const normalizeTransactionType = (value) => {
@@ -39,6 +40,76 @@ const normalizeTransactionType = (value) => {
   return undefined;
 };
 
+/**
+ * Infer income vs expense from a single row's content when no explicit
+ * "type" column is present.
+ *
+ * Priority order:
+ *  1. A dedicated "type" / "transaction type" column value
+ *  2. Reference / ID prefix  (SAL → income, EXP/PUR/PAY → expense)
+ *  3. Category or Description keywords
+ *  4. Amount sign  (negative → expense; positive alone is NOT proof of expense)
+ *  5. Default: "expense" (last resort)
+ */
+const inferTypeFromRow = (row) => {
+  const entries = Object.entries(row || {});
+  const get = (...names) => {
+    for (const name of names) {
+      const lc = name.toLowerCase();
+      for (const [k, v] of entries) {
+        if (String(k).toLowerCase() === lc) return String(v ?? "").trim();
+      }
+    }
+    return "";
+  };
+
+  // 1. Explicit type column
+  const explicit = normalizeTransactionType(
+    get("type", "transaction type", "txn type", "trans type"),
+  );
+  if (explicit) return explicit;
+
+  // 2. Reference / ID prefix
+  const ref = get(
+    "id", "transaction id", "reference", "ref", "sale id", "sales id",
+    "expense id", "invoice id", "invoice no", "invoice number",
+  );
+  if (ref) {
+    const refUpper = ref.toUpperCase();
+    if (/^(SAL|SLS|INV|REV|REC|RCPT|INC|CR)/.test(refUpper)) return "income";
+    if (/^(EXP|PUR|PAY|PMT|BILL|COST|DR)/.test(refUpper)) return "expense";
+  }
+
+  // 3. Category keywords
+  const category = get("category", "cat");
+  if (category) {
+    const catLc = category.toLowerCase();
+    if (/\b(sale|sales|revenue|income|receipt|credit|invoice|earning|gain)\b/.test(catLc))
+      return "income";
+    if (/\b(expense|cost|purchase|payment|bill|fee|charge|debit|spend)\b/.test(catLc))
+      return "expense";
+  }
+
+  // 4. Description keywords
+  const desc = get("description", "desc", "details", "narration", "memo", "purpose");
+  if (desc) {
+    const descLc = desc.toLowerCase();
+    if (/\b(sale|sales|revenue|income|receipt|credit|earned|invoice|customer payment)\b/.test(descLc))
+      return "income";
+    if (/\b(expense|purchase|payment|bill|fee|charge|subscription|salary|rent|utility)\b/.test(descLc))
+      return "expense";
+  }
+
+  // 5. Amount sign
+  const amountRaw = get("amount", "total", "net", "gross", "value", "price", "debit", "credit");
+  if (amountRaw !== "") {
+    const num = parseFloat(String(amountRaw).replace(/[^0-9.-]/g, ""));
+    if (!isNaN(num) && num < 0) return "expense";
+  }
+
+  return "expense"; // final fallback
+};
+
 const normalizeStatus = (value) => {
   if (value === undefined || value === null) return undefined;
   const raw = String(value).trim().toLowerCase();
@@ -48,15 +119,163 @@ const normalizeStatus = (value) => {
   return undefined;
 };
 
+// ---------------------------------------------------------------------------
+// inferCategoryFromRow
+// Assigns a meaningful category based on description, vendor, reference ID,
+// amount, and transaction type when no explicit category column is present
+// (or when the column value is blank / "Uncategorized").
+//
+// Returns a string category name.
+// ---------------------------------------------------------------------------
+const CATEGORY_RULES = [
+  // ── INCOME ──────────────────────────────────────────────────────────────
+  { pattern: /\b(sale|sales|sold|invoice|invoiced|receipt|revenue|turnover|retail)\b/i,  type: "income",  category: "Sales Revenue" },
+  { pattern: /\b(service fee|service revenue|consulting|advisory|professional service|project fee)\b/i, type: "income", category: "Service Revenue" },
+  { pattern: /\b(interest income|interest earned|bank interest|savings interest)\b/i, type: "income", category: "Interest Income" },
+  { pattern: /\b(rental income|rent received|lease income|sublease)\b/i, type: "income", category: "Rental Income" },
+  { pattern: /\b(dividend|investment return|capital gain|stock sale)\b/i, type: "income", category: "Investment Income" },
+  { pattern: /\b(refund|rebate|cashback|reimbursement received|credit note)\b/i, type: "income", category: "Refunds & Rebates" },
+  { pattern: /\b(grant|donation received|contribution|sponsorship income)\b/i, type: "income", category: "Grants & Donations" },
+  { pattern: /\b(subscription income|membership fee|license fee received)\b/i, type: "income", category: "Subscription Income" },
+  { pattern: /\b(commission earned|affiliate income|referral income)\b/i, type: "income", category: "Commissions" },
+  { pattern: /\b(product sale|goods sold|merchandise)\b/i, type: "income", category: "Product Sales" },
+
+  // ── PAYROLL & HR ─────────────────────────────────────────────────────────
+  { pattern: /\b(salary|salaries|payroll|wage|wages|paycheck|compensation|employee pay|staff pay|hr payment)\b/i, category: "Salaries & Payroll" },
+  { pattern: /\b(bonus|incentive|commission paid|overtime pay)\b/i, category: "Salaries & Payroll" },
+  { pattern: /\b(contractor|freelance|independent contractor|temp staff|agency worker)\b/i, category: "Contract Labor" },
+
+  // ── RENT & FACILITIES ────────────────────────────────────────────────────
+  { pattern: /\b(rent|lease|rental|office space|coworking|storage rent)\b/i, category: "Rent & Lease" },
+  { pattern: /\b(maintenance|repair|service contract|cleaning|janitorial|facility)\b/i, category: "Maintenance & Repairs" },
+
+  // ── UTILITIES ────────────────────────────────────────────────────────────
+  { pattern: /\b(electricity|electric bill|power bill|kwh|energy bill)\b/i, category: "Utilities" },
+  { pattern: /\b(water bill|water service|sewage|water usage)\b/i, category: "Utilities" },
+  { pattern: /\b(internet|broadband|wifi|network service|isp|data plan)\b/i, category: "Utilities" },
+  { pattern: /\b(phone|telephone|mobile|cellular|telecom|at&t|verizon|t-mobile)\b/i, category: "Utilities" },
+  { pattern: /\b(gas bill|natural gas|heating bill)\b/i, category: "Utilities" },
+
+  // ── TRAVEL & TRANSPORT ───────────────────────────────────────────────────
+  { pattern: /\b(flight|airline|airfare|air ticket|plane ticket|airways|delta|united|american air|emirates)\b/i, category: "Travel & Transport" },
+  { pattern: /\b(hotel|accommodation|lodging|airbnb|booking\.com|motel|inn|resort)\b/i, category: "Travel & Transport" },
+  { pattern: /\b(uber|lyft|taxi|cab|rideshare|careem|bolt|grab)\b/i, category: "Travel & Transport" },
+  { pattern: /\b(fuel|gasoline|petrol|diesel|gas station|shell|bp|chevron|exxon)\b/i, category: "Travel & Transport" },
+  { pattern: /\b(train|rail|amtrak|metro|subway|bus fare|transit|toll|parking)\b/i, category: "Travel & Transport" },
+  { pattern: /\b(car rental|vehicle rental|hertz|avis|enterprise rental)\b/i, category: "Travel & Transport" },
+  { pattern: /\b(mileage|travel expense|per diem|business trip)\b/i, category: "Travel & Transport" },
+
+  // ── FOOD & MEALS ─────────────────────────────────────────────────────────
+  { pattern: /\b(restaurant|cafe|coffee|starbucks|mcdonalds|mcdonald|subway|burger|pizza|dining|lunch|dinner|breakfast|meal|food)\b/i, category: "Meals & Entertainment" },
+  { pattern: /\b(entertainment|event ticket|concert|cinema|theatre|team outing|client entertainment)\b/i, category: "Meals & Entertainment" },
+
+  // ── MARKETING & ADVERTISING ──────────────────────────────────────────────
+  { pattern: /\b(advertising|ads|ad spend|ad campaign|google ads|facebook ads|meta ads|instagram ads|linkedin ads|tiktok ads)\b/i, category: "Marketing & Advertising" },
+  { pattern: /\b(marketing|promotion|campaign|seo|social media|content creation|influencer|pr agency|public relations)\b/i, category: "Marketing & Advertising" },
+  { pattern: /\b(print|flyer|banner|brochure|signage|trade show|exhibition)\b/i, category: "Marketing & Advertising" },
+
+  // ── OFFICE SUPPLIES ──────────────────────────────────────────────────────
+  { pattern: /\b(office supply|office supplies|stationery|paper|printer|toner|ink cartridge|staples store|amazon|office depot)\b/i, category: "Office Supplies" },
+  { pattern: /\b(furniture|desk|chair|equipment purchase|computer|laptop|monitor|keyboard|mouse)\b/i, category: "Office Supplies" },
+
+  // ── SOFTWARE & SUBSCRIPTIONS ─────────────────────────────────────────────
+  { pattern: /\b(software|saas|subscription|license|microsoft|google workspace|slack|zoom|salesforce|hubspot|quickbooks|xero|dropbox|adobe)\b/i, category: "Software & Subscriptions" },
+  { pattern: /\b(app store|play store|apple|cloud storage|hosting|domain|aws|azure|gcp|digitalocean)\b/i, category: "Software & Subscriptions" },
+  { pattern: /\b(streaming|netflix|spotify|youtube premium|annual plan|monthly plan)\b/i, category: "Software & Subscriptions" },
+
+  // ── PROFESSIONAL SERVICES ────────────────────────────────────────────────
+  { pattern: /\b(legal|attorney|lawyer|law firm|legal fee|court)\b/i, category: "Professional Services" },
+  { pattern: /\b(accounting|accountant|audit|cpa|bookkeeping|tax preparation)\b/i, category: "Professional Services" },
+  { pattern: /\b(consulting fee|consultant|advisory fee|management fee)\b/i, category: "Professional Services" },
+
+  // ── INSURANCE ────────────────────────────────────────────────────────────
+  { pattern: /\b(insurance|premium|policy|coverage|health insurance|life insurance|property insurance|liability|workers comp)\b/i, category: "Insurance" },
+
+  // ── BANKING & FINANCE ────────────────────────────────────────────────────
+  { pattern: /\b(bank fee|bank charge|service charge|transaction fee|wire fee|atm fee|overdraft|nsf)\b/i, category: "Bank & Finance Charges" },
+  { pattern: /\b(interest expense|loan interest|mortgage interest|credit card interest|finance charge)\b/i, category: "Bank & Finance Charges" },
+  { pattern: /\b(loan repayment|loan payment|mortgage payment|emi|installment)\b/i, category: "Loan Repayment" },
+  { pattern: /\b(credit card payment|card payment|cc payment)\b/i, category: "Bank & Finance Charges" },
+
+  // ── TAXES ────────────────────────────────────────────────────────────────
+  { pattern: /\b(tax|vat|gst|sales tax|income tax|payroll tax|corporate tax|irs|hmrc|withholding tax|customs duty|import duty)\b/i, category: "Taxes & Duties" },
+
+  // ── SHIPPING & LOGISTICS ─────────────────────────────────────────────────
+  { pattern: /\b(shipping|freight|courier|fedex|ups|dhl|usps|delivery|postage|cargo|logistics|import|export)\b/i, category: "Shipping & Logistics" },
+
+  // ── HEALTHCARE ───────────────────────────────────────────────────────────
+  { pattern: /\b(medical|doctor|hospital|pharmacy|medicine|dental|vision|healthcare|clinic)\b/i, category: "Healthcare" },
+
+  // ── TRAINING & EDUCATION ─────────────────────────────────────────────────
+  { pattern: /\b(training|course|workshop|seminar|conference|certification|udemy|coursera|education|tuition|learning)\b/i, category: "Training & Education" },
+
+  // ── INVENTORY & GOODS ────────────────────────────────────────────────────
+  { pattern: /\b(inventory|stock|raw material|material|goods purchase|product purchase|merchandise purchase|cogs|cost of goods)\b/i, category: "Inventory & COGS" },
+  { pattern: /\b(supplier|vendor payment|purchase order|po |wholesale|procurement)\b/i, category: "Inventory & COGS" },
+
+  // ── TRANSFERS ────────────────────────────────────────────────────────────
+  { pattern: /\b(transfer|interbank|wire transfer|ach|bank transfer|funds transfer|internal transfer)\b/i, category: "Transfers" },
+];
+
+/**
+ * Returns the best-matching category name for a transaction row.
+ * Searches description, vendor, category column, and reference in that order.
+ * Falls back to a type-aware default ("Sales Revenue" for income, "Other Expense" for expense).
+ */
+const inferCategoryFromRow = (row, transactionType) => {
+  const get = (...keys) => {
+    for (const key of keys) {
+      const lc = key.toLowerCase();
+      for (const [k, v] of Object.entries(row || {})) {
+        if (String(k).toLowerCase() === lc) return String(v ?? "").trim();
+      }
+    }
+    return "";
+  };
+
+  // Build a combined text blob from the most descriptive fields
+  const text = [
+    get("description", "desc", "details", "narration", "memo", "purpose", "notes"),
+    get("vendor", "merchant", "supplier", "customer", "payee", "company", "name"),
+    get("category", "cat", "type", "product", "item", "department"),
+    get("id", "transaction id", "reference", "ref", "sale id", "expense id", "invoice id"),
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  if (!text.trim()) {
+    // Nothing to match on — use type-aware defaults
+    if (transactionType === "income") return "Sales Revenue";
+    if (transactionType === "transfer") return "Transfers";
+    return "Other Expense";
+  }
+
+  // Try type-specific rules first, then general rules
+  for (const rule of CATEGORY_RULES) {
+    if (rule.type && rule.type !== transactionType) continue; // skip wrong-type rules
+    if (rule.pattern.test(text)) return rule.category;
+  }
+  // Second pass — ignore type restriction
+  for (const rule of CATEGORY_RULES) {
+    if (rule.pattern.test(text)) return rule.category;
+  }
+
+  // Type-aware fallback
+  if (transactionType === "income") return "Sales Revenue";
+  if (transactionType === "transfer") return "Transfers";
+  return "Other Expense";
+};
+
 const genAI = new GoogleGenerativeAI(
   process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY,
 );
 
-const os = require('os');
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    // In Vercel, only /tmp is writable
-    const uploadDir = os.tmpdir();
+    const uploadDir = path.join(__dirname, "../uploads");
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
@@ -208,15 +427,20 @@ const buildTransactionFromChunkRow = (row, userId, job) => {
 
   const transactionType =
     normalizeTransactionType(getValue(["type"])) ||
-    (amountRaw !== undefined && String(amountRaw).trim().startsWith("-")
-      ? "expense"
-      : "expense");
+    inferTypeFromRow(row);
 
   const normalizedDate = date && !Number.isNaN(date.getTime()) ? date : new Date();
   const normalizedAmount = Number.isFinite(amount) ? Math.abs(amount) : 0;
   const normalizedDesc = description || String(getValue(["vendor", "name", "title"]) || "Imported transaction");
   const normalizedVendor = String(getValue(["vendor", "merchant"]) || "");
-  const normalizedCategory = String(getValue(["category"]) || "Uncategorized");
+
+  // Use the explicit category if present, otherwise infer from row content
+  const rawCategory = String(getValue(["category"]) || "").trim();
+  const normalizedCategory =
+    rawCategory && rawCategory.toLowerCase() !== "uncategorized"
+      ? rawCategory
+      : inferCategoryFromRow(row, transactionType);
+
   const normalizedStatus = normalizeStatus(getValue(["status"])) || "pending";
 
   return {
@@ -528,60 +752,110 @@ const analyzeWithAI = async (data, fileType) => {
         hasKey("expense id") ||
         hasKey("sale");
 
+      const hasAmountLike =
+        hasKey("amount") || hasKey("total") || hasKey("net") ||
+        hasKey("gross") || hasKey("price");
+
       if (hasStructuredFields) {
-        const hasAmountLike =
-          hasKey("amount") ||
-          hasKey("total") ||
-          hasKey("net") ||
-          hasKey("gross") ||
-          hasKey("price");
-        const salesSignals = [
-          hasKey("sale"),
-          hasKey("sales"),
-          hasKey("customer"),
-          hasKey("invoice"),
-          hasKey("product") && hasKey("quantity"),
+        // ── Smarter type detection ──────────────────────────────────────────
+        // 1. Column-header signals
+        const headerSalesSignals = [
+          hasKey("sale"), hasKey("sales"), hasKey("customer"),
+          hasKey("invoice"), hasKey("product") && hasKey("quantity"),
           hasKey("sales rep"),
         ].filter(Boolean).length;
 
-        const transactionType =
-          salesSignals >= 2 && hasAmountLike ? "income" : "expense";
+        const headerExpenseSignals = [
+          hasKey("expense id"), hasKey("expense"), hasKey("supplier"),
+          hasKey("vendor") && !hasKey("customer"), hasKey("cost"),
+          hasKey("purchase"),
+        ].filter(Boolean).length;
+
+        // 2. Row-data signals from the first row
+        const rowInferred = inferTypeFromRow(firstRow);
+
+        // 3. Sample the first 5 rows and tally inferred types
+        const sampleRows = limitedData.slice(0, 5);
+        const sampleIncomeCt = sampleRows.filter((r) => inferTypeFromRow(r) === "income").length;
+        const sampleExpenseCt = sampleRows.length - sampleIncomeCt;
+
+        let transactionType;
+        if (headerSalesSignals >= 2 && hasAmountLike && sampleExpenseCt === 0) {
+          transactionType = "income";
+        } else if (headerExpenseSignals >= 2 && sampleIncomeCt === 0) {
+          transactionType = "expense";
+        } else if (sampleIncomeCt > sampleExpenseCt) {
+          // Majority of sampled rows look like income — use per-row inference
+          transactionType = "per_row";
+        } else if (sampleExpenseCt > sampleIncomeCt) {
+          transactionType = "expense";
+        } else {
+          // Tie or single row — trust the first row's inferred type
+          transactionType = rowInferred;
+        }
+
         console.log(
-          `Detected structured ${transactionType} data (bypassing AI), processing directly...`,
+          `Detected structured data — headerSales=${headerSalesSignals} headerExpense=${headerExpenseSignals} sampleIncome=${sampleIncomeCt}/${sampleRows.length} → mode=${transactionType}`,
         );
+
+        if (transactionType === "per_row") {
+          // Build a per-row schema so resolveRowType infers each row individually
+          return processStructuredExcelData(data, {
+            columnMap: {},
+            typeRule: { mode: "per_row_infer" },
+          });
+        }
         return processStructuredExcelData(data, transactionType);
       }
 
       dataToAnalyze = limitedData;
 
       prompt = `
-            Analyze the following Excel data and extract financial transactions. 
-            Each row represents a potential transaction. Look for columns that might contain:
-            - Date information (any date format)
-            - Amount/money values (numbers, could be positive or negative)
-            - Description/details about the transaction
-            - Category or type information
-            
+            Analyze the following Excel data and extract financial transactions.
+            Each row represents a potential transaction. Determine the correct type AND category for EACH row individually.
+
             Data sample: ${JSON.stringify(limitedData)}
-            
-            For each valid transaction row, respond with a JSON array:
+
+            Respond with ONLY a JSON array (no markdown, no explanation):
             [
                 {
-                    "date": "YYYY-MM-DD format",
+                    "date": "YYYY-MM-DD",
                     "description": "transaction description",
                     "amount": positive_number,
-                    "category": "best_guess_category",
-                    "vendor": "vendor if identifiable",
-                    "type": "expense",
-                    "confidence": 0.8
+                    "category": "specific category name",
+                    "vendor": "vendor or customer name if identifiable",
+                    "type": "income OR expense OR transfer",
+                    "confidence": 0.9
                 }
             ]
-            
-            Important: 
-            - Convert all dates to YYYY-MM-DD format
-            - Make amounts positive numbers
-            - If no clear transactions found, return empty array []
-            - Only include rows that clearly look like financial transactions
+
+            Rules for "type":
+            - "income"   — revenue, sale, receipt, credit, money received
+            - "expense"  — cost, purchase, payment, debit, money paid out
+            - "transfer" — money moved between accounts with no net gain/loss
+            - If the file is clearly a sales/invoices file, use "income" for all rows
+            - If the file is clearly an expense/payables file, use "expense" for all rows
+            - Infer from column names AND cell values — do NOT default everything to "expense"
+
+            Rules for "category" — pick the BEST match from this list:
+            Income: "Sales Revenue", "Service Revenue", "Interest Income", "Rental Income",
+                    "Investment Income", "Refunds & Rebates", "Grants & Donations",
+                    "Subscription Income", "Commissions", "Product Sales"
+            Expenses: "Salaries & Payroll", "Contract Labor", "Rent & Lease",
+                      "Utilities", "Travel & Transport", "Meals & Entertainment",
+                      "Marketing & Advertising", "Office Supplies",
+                      "Software & Subscriptions", "Professional Services",
+                      "Insurance", "Bank & Finance Charges", "Loan Repayment",
+                      "Taxes & Duties", "Shipping & Logistics", "Healthcare",
+                      "Training & Education", "Inventory & COGS",
+                      "Maintenance & Repairs", "Other Expense"
+            Other: "Transfers"
+            - Use the description, vendor name, reference ID, and column context to choose
+            - Never use "Uncategorized" — always pick the closest match
+
+            Other rules:
+            - Dates must be YYYY-MM-DD; amounts must be positive numbers
+            - Return [] if no valid transactions found
             `;
     } else {
       // PDF
@@ -592,18 +866,40 @@ const analyzeWithAI = async (data, fileType) => {
             
             Text: ${data}
             
-            Please respond with ONLY a JSON array in this format:
+            Please respond with ONLY a JSON array in this format (no markdown, no explanation):
             [
                 {
                     "date": "YYYY-MM-DD",
                     "description": "transaction description",
-                    "amount": number,
-                    "category": "suggested category",
-                    "vendor": "vendor name if available",
-                    "type": "expense",
+                    "amount": positive_number,
+                    "category": "specific category name",
+                    "vendor": "vendor or customer name if available",
+                    "type": "income OR expense OR transfer",
                     "confidence": 0.9
                 }
             ]
+
+            Rules for "type":
+            - "income"   if the row represents a sale, revenue, receipt, credit, or money received
+            - "expense"  if the row represents a cost, purchase, payment, debit, or money paid out
+            - "transfer" if money moved between accounts
+            - Infer from context — do NOT default everything to "expense"
+
+            Rules for "category" — pick the BEST match from this list:
+            Income: "Sales Revenue", "Service Revenue", "Interest Income", "Rental Income",
+                    "Investment Income", "Refunds & Rebates", "Grants & Donations",
+                    "Subscription Income", "Commissions", "Product Sales"
+            Expenses: "Salaries & Payroll", "Contract Labor", "Rent & Lease",
+                      "Utilities", "Travel & Transport", "Meals & Entertainment",
+                      "Marketing & Advertising", "Office Supplies",
+                      "Software & Subscriptions", "Professional Services",
+                      "Insurance", "Bank & Finance Charges", "Loan Repayment",
+                      "Taxes & Duties", "Shipping & Logistics", "Healthcare",
+                      "Training & Education", "Inventory & COGS",
+                      "Maintenance & Repairs", "Other Expense"
+            Other: "Transfers"
+            - Use description, vendor, amounts, and context to choose the best category
+            - Never use "Uncategorized" — always pick the closest match
             
             If no transactions found, return empty array [].
             `;
@@ -943,13 +1239,144 @@ const cancelImportJob = async (req, res) => {
   }
 };
 
+// ---------------------------------------------------------------------------
+// AI-powered schema analysis — reads headers + sample rows and returns:
+//   fileType: "sales" | "expenses" | "hybrid" | "bank_statement" | "payroll"
+//   columnMap: { amount, date, description[], vendor, category }
+//   typeRule: { mode: "all_income"|"all_expense"|"sign_based"|"column_based",
+//               column, incomeValues[], expenseValues[] }
+// ---------------------------------------------------------------------------
+const buildFallbackSchema = (headers, rows) => {
+  const lc = (s) => String(s || "").toLowerCase();
+  const keysLower = headers.map(lc);
+  const has = (needle) => keysLower.some((k) => k === needle || k.includes(needle));
+
+  const salesScore = [has("sale"), has("customer"), has("invoice"), has("order"), has("revenue"), has("sales rep")].filter(Boolean).length;
+  const expenseScore = [has("expense"), has("vendor"), has("supplier"), has("department"), has("employee")].filter(Boolean).length;
+
+  const amountCol = headers.find((h) => /net.?amount|final.?amount/i.test(h))
+    || headers.find((h) => /^amount$/i.test(h))
+    || headers.find((h) => /amount|total|net|gross|price/i.test(h));
+  const dateCol = headers.find((h) => /date/i.test(h));
+  const descCols = headers.filter((h) => /description|desc|memo|product|item|purpose|details/i.test(h)).slice(0, 2);
+  const vendorCol = headers.find((h) => /vendor|supplier|customer|payee|company/i.test(h));
+  const categoryCol = headers.find((h) => /category|department|region/i.test(h))
+    || headers.find((h) => /product|type/i.test(h));
+
+  // Check for a direction/type column (e.g. "Debit/Credit", "Transaction Type")
+  const typeCol = headers.find((h) => /direction|debit.?credit|cr.?dr|txn.?type|transaction.?type/i.test(h));
+
+  let fileType = "expenses";
+  let mode = "all_expense";
+  if (salesScore > expenseScore) { fileType = "sales"; mode = "all_income"; }
+  else if (salesScore === expenseScore && (salesScore > 0 || expenseScore > 0)) { fileType = "hybrid"; mode = "sign_based"; }
+
+  if (typeCol) mode = "column_based";
+
+  return {
+    fileType,
+    fileSummary: `Detected via column-name signals (sales=${salesScore}, expenses=${expenseScore})`,
+    columnMap: { amount: amountCol || null, date: dateCol || null, description: descCols, vendor: vendorCol || null, category: categoryCol || null },
+    typeRule: {
+      mode,
+      column: typeCol || null,
+      incomeValues: typeCol ? ["credit", "cr", "in", "income", "receipt", "sale"] : [],
+      expenseValues: typeCol ? ["debit", "dr", "out", "expense", "payment", "purchase"] : [],
+    },
+  };
+};
+
+const analyzeFileSchema = async (rows) => {
+  const headers = rows.length > 0 ? Object.keys(rows[0]) : [];
+  const sample = rows.slice(0, 15);
+
+  const prompt = `You are a financial data analyst. Analyze this Excel/CSV file schema.
+
+HEADERS: ${JSON.stringify(headers)}
+SAMPLE ROWS (first ${sample.length}): ${JSON.stringify(sample)}
+
+Respond with ONLY a valid JSON object — no markdown, no extra text:
+{
+  "fileType": "sales",
+  "fileSummary": "one sentence",
+  "columnMap": {
+    "amount": "<exact column name for the final/net monetary amount>",
+    "date": "<exact column name for date>",
+    "description": ["<col1>", "<col2 optional>"],
+    "vendor": "<exact column name for vendor/payee/customer, or null>",
+    "category": "<exact column name for category/product/type, or null>"
+  },
+  "typeRule": {
+    "mode": "all_income",
+    "column": null,
+    "incomeValues": [],
+    "expenseValues": []
+  }
+}
+
+fileType must be exactly one of: "sales", "expenses", "hybrid", "bank_statement", "payroll"
+mode must be exactly one of:
+  "all_income"     — every row is income/revenue (e.g. a sales ledger)
+  "all_expense"    — every row is an expense (e.g. an expense report)
+  "sign_based"     — positive amount = income, negative = expense
+  "column_based"   — a column distinguishes income vs expense rows
+
+For "column_based": set "column" to the exact header name and list the values that mean income vs expense.`;
+
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const result = await model.generateContent(prompt);
+    const text = result.response.text().trim().replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+    const schema = JSON.parse(text);
+    console.log("[analyzeFileSchema] AI result:", JSON.stringify(schema));
+    return schema;
+  } catch (err) {
+    console.warn("[analyzeFileSchema] AI call failed, using fallback:", err.message);
+    return buildFallbackSchema(headers, rows);
+  }
+};
+
+// Resolve per-row transaction type using the schema's typeRule
+const resolveRowType = (row, typeRule) => {
+  if (!typeRule) return inferTypeFromRow(row);
+  const { mode, column, incomeValues = [], expenseValues = [] } = typeRule;
+
+  if (mode === "all_income") return "income";
+  if (mode === "all_expense") return "expense";
+  if (mode === "per_row_infer") return inferTypeFromRow(row);
+
+  if (mode === "sign_based") {
+    const keys = Object.keys(row);
+    const numericVal = keys.reduce((found, k) => {
+      if (found !== null) return found;
+      const v = parseFloat(row[k]);
+      return (!isNaN(v) && v !== 0) ? v : null;
+    }, null);
+    return numericVal !== null && numericVal < 0 ? "expense" : "income";
+  }
+
+  if (mode === "column_based" && column && row[column] != null) {
+    const val = String(row[column]).toLowerCase().trim();
+    if (incomeValues.some((iv) => String(iv).toLowerCase() === val || val.includes(String(iv).toLowerCase()))) return "income";
+    if (expenseValues.some((ev) => String(ev).toLowerCase() === val || val.includes(String(ev).toLowerCase()))) return "expense";
+  }
+
+  // Fall back to content-based inference instead of blindly returning "expense"
+  return inferTypeFromRow(row);
+};
+
 // Process well-structured Excel data directly (bypassing AI)
-const processStructuredExcelData = (data, transactionType = "expense") => {
+const processStructuredExcelData = (data, schemaOrType = "expense") => {
+  // Accept legacy string argument for backwards compat
+  const schema = (typeof schemaOrType === "string")
+    ? { columnMap: {}, typeRule: { mode: schemaOrType === "income" ? "all_income" : "all_expense" } }
+    : schemaOrType;
+
+  const { columnMap = {}, typeRule } = schema;
   console.log(
     "Processing",
     data.length,
-    "structured Excel rows directly as",
-    transactionType,
+    `structured Excel rows (mode=${(schema.typeRule || {}).mode || "?"})`,
     "...",
   );
   const transactions = [];
@@ -1035,14 +1462,14 @@ const processStructuredExcelData = (data, transactionType = "expense") => {
         if (numericKey) amount = parseFloat(row[numericKey]);
       }
 
-      const category =
+      const rawCategory =
         row["Category"] ||
         row["category"] ||
         row["Type"] ||
         row["type"] ||
         row["Product"] ||
         row["product"] ||
-        "Uncategorized";
+        "";
       const vendor =
         row["Vendor"] ||
         row["vendor"] ||
@@ -1123,13 +1550,20 @@ const processStructuredExcelData = (data, transactionType = "expense") => {
         }
 
         if (!isNaN(parsedDate.getTime())) {
+          const rowType = resolveRowType(row, typeRule);
+          // Use explicit category if present; otherwise infer from row content
+          const resolvedCategory =
+            rawCategory && rawCategory.toLowerCase() !== "uncategorized"
+              ? rawCategory
+              : inferCategoryFromRow(row, rowType);
+
           const transaction = {
             date: parsedDate.toISOString().split("T")[0],
             description: `${description}${employee ? ` - ${employee}` : ""}`,
             amount: Math.abs(amount),
-            category: category,
+            category: resolvedCategory,
             vendor: vendor,
-            type: transactionType,
+            type: rowType,
             confidence: 0.95,
             department: department,
             originalStatus: status,
@@ -1287,77 +1721,21 @@ const uploadAndAnalyzeFile = async (req, res) => {
     let extractedData;
     if (fileType === "excel") {
       extractedData = extractDataFromExcel(filePath);
-      console.log(
-        "Excel data extracted successfully, rows:",
-        extractedData.length,
-      );
+      console.log("Excel data extracted successfully, rows:", extractedData.length);
 
-      // Check if this is a well-structured report (sales or expenses)
-      const firstRow = extractedData[0];
-      const keysLower = firstRow
-        ? Object.keys(firstRow).map((k) => String(k).toLowerCase())
-        : [];
+      if (extractedData.length > 0) {
+        // Use AI to analyse the schema so we can correctly type every row
+        console.log("🤖 Analysing file schema with AI...");
+        const schema = await analyzeFileSchema(extractedData);
+        console.log(`📊 File type detected: ${schema.fileType} | mode: ${schema.typeRule?.mode}`);
 
-      const hasKey = (needle) =>
-        keysLower.some((k) => k === needle || k.includes(needle));
-
-      const hasAmountLike =
-        hasKey("amount") ||
-        hasKey("total") ||
-        hasKey("net") ||
-        hasKey("gross") ||
-        hasKey("price");
-      const hasDateLike = hasKey("date");
-
-      // Sales indicators
-      const salesSignals = [
-        hasKey("sale"),
-        hasKey("sales"),
-        hasKey("customer"),
-        hasKey("invoice"),
-        hasKey("order"),
-        hasKey("product") && hasKey("quantity"),
-        hasKey("sales rep"),
-      ].filter(Boolean).length;
-
-      // Expense indicators
-      const expenseSignals = [
-        hasKey("expense"),
-        hasKey("vendor"),
-        hasKey("employee"),
-        hasKey("supplier"),
-        hasKey("department"),
-      ].filter(Boolean).length;
-
-      const hasSalesStructure =
-        !!firstRow && salesSignals >= 2 && hasAmountLike;
-      const hasExpenseStructure =
-        !!firstRow &&
-        (hasKey("expense id") ||
-          (expenseSignals >= 2 && hasAmountLike && hasDateLike));
-
-      const transactionType = hasSalesStructure ? "income" : "expense";
-
-      if (hasExpenseStructure || hasSalesStructure) {
-        console.log(
-          `Detected structured ${transactionType} data, processing directly...`,
-        );
-        const transactions = processStructuredExcelData(
-          extractedData,
-          transactionType,
-        );
-        console.log(
-          `processStructuredExcelData returned ${transactions.length} transactions`,
-        );
+        const transactions = processStructuredExcelData(extractedData, schema);
+        console.log(`processStructuredExcelData returned ${transactions.length} transactions`);
 
         if (transactions.length > 0) {
-          // Save structured transactions directly to database using bulk insert (much faster)
           const userId = req.user._id;
           const localStore = useLocalTransactionStore(userId);
-          console.log(
-            `Starting to save ${transactions.length} transactions for user: ${userId}`,
-          );
-          console.log(`User ID type: ${typeof userId}, Value: ${userId}`);
+          console.log(`Starting to save ${transactions.length} transactions for user: ${userId}`);
 
           // Prepare all transactions for bulk insert
           const transactionsToInsert = transactions.map((transaction, i) => {
@@ -1376,7 +1754,9 @@ const uploadAndAnalyzeFile = async (req, res) => {
               date: new Date(transaction.date),
               desc: transaction.description || "Transaction",
               amount: Math.abs(transaction.amount),
-              category: transaction.category || "Uncategorized",
+              category: (transaction.category && transaction.category !== "Uncategorized")
+                ? transaction.category
+                : inferCategoryFromRow(transaction, normalizeTransactionType(transaction.type) || "expense"),
               vendor: transaction.vendor || "",
               type: normalizeTransactionType(transaction.type) || "expense",
               status: "needs_review",
@@ -1446,24 +1826,26 @@ const uploadAndAnalyzeFile = async (req, res) => {
           // Clean up uploaded file
           fs.unlinkSync(filePath);
 
+          // Count as one excel upload
+          usageService.increment(req.user._id, "excelUploads").catch(() => {});
+
           return res.json({
             success: true,
-            message: `Successfully processed ${savedTransactions.length} transactions from structured Excel file`,
+            message: `Successfully processed ${savedTransactions.length} transactions from ${schema.fileType} Excel file`,
             data: {
               transactions: savedTransactions,
               totalProcessed: savedTransactions.length,
               transactionsSaved: savedTransactions.length,
               transactionsFound: transactions.length,
-              processedDirectly: true,
+              fileType: schema.fileType,
+              typingMode: schema.typeRule?.mode,
             },
           });
         } else {
           console.warn("No valid transactions found in structured Excel data");
-          // Clean up uploaded file
           fs.unlinkSync(filePath);
           return res.status(400).json({
             error: "No valid transactions found in the Excel file",
-            debug: "processStructuredExcelData returned 0 transactions",
           });
         }
       }
@@ -1498,7 +1880,9 @@ const uploadAndAnalyzeFile = async (req, res) => {
       date: new Date(transaction.date),
       desc: transaction.description,
       amount: Math.abs(transaction.amount),
-      category: transaction.category || "Uncategorized",
+      category: (transaction.category && transaction.category !== "Uncategorized")
+        ? transaction.category
+        : inferCategoryFromRow(transaction, normalizeTransactionType(transaction.type) || "expense"),
       vendor: transaction.vendor,
       type: normalizeTransactionType(transaction.type) || "expense",
       sourceFile: {
@@ -1674,6 +2058,8 @@ const createTransaction = async (req, res) => {
       "Type:",
       saved.type,
     );
+    // Increment usage counter (fire-and-forget, don't block the response)
+    usageService.increment(userId, "transactions").catch(() => {});
     return res.status(201).json(saved);
   } catch (error) {
     console.error("Error creating transaction:", error);

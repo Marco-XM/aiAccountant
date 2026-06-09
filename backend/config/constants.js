@@ -64,6 +64,90 @@ const RATE_LIMIT = {
   LOGIN_WINDOW_MS: 15 * 60 * 1000, // 15 minutes
 };
 
+// Subscription Plans
+const SUBSCRIPTION_PLANS = {
+  free: {
+    id: "free",
+    name: "Free",
+    description: "Perfect for getting started",
+    price: { monthly: 0, annual: 0 },
+    limits: {
+      transactions: 50,
+      excelUploads: 2,
+      aiChartGenerations: 10,
+      aiChatMessages: 20,
+      aiExcelGenerations: 5,
+    },
+    features: [
+      "Up to 50 transactions/month",
+      "2 Excel file uploads",
+      "10 AI chart generations",
+      "20 AI chat messages",
+      "5 AI Excel generations",
+      "Basic dashboard",
+      "Email support",
+    ],
+  },
+  pro: {
+    id: "pro",
+    name: "Pro",
+    description: "For growing businesses",
+    price: { monthly: 19, annual: 190 },
+    limits: {
+      transactions: 500,
+      excelUploads: 20,
+      aiChartGenerations: 100,
+      aiChatMessages: 500,
+      aiExcelGenerations: 50,
+    },
+    features: [
+      "Up to 500 transactions/month",
+      "20 Excel file uploads",
+      "100 AI chart generations",
+      "500 AI chat messages",
+      "50 AI Excel generations",
+      "Advanced dashboard",
+      "Priority email support",
+      "Export to PDF",
+      "Team collaboration (up to 3)",
+    ],
+  },
+  business: {
+    id: "business",
+    name: "Business",
+    description: "For enterprises & agencies",
+    price: { monthly: 49, annual: 490 },
+    limits: {
+      transactions: -1,
+      excelUploads: -1,
+      aiChartGenerations: -1,
+      aiChatMessages: -1,
+      aiExcelGenerations: -1,
+    },
+    features: [
+      "Unlimited transactions",
+      "Unlimited Excel file uploads",
+      "Unlimited AI chart generations",
+      "Unlimited AI chat messages",
+      "Unlimited AI Excel generations",
+      "Full analytics suite",
+      "Dedicated support",
+      "Export to PDF & CSV",
+      "Team collaboration (unlimited)",
+      "API access",
+      "Custom integrations",
+    ],
+  },
+};
+
+// Fake Payment Test Cards
+const FAKE_PAYMENT_CARDS = {
+  SUCCESS: ["4242424242424242", "5555555555554444"],
+  DECLINED: ["4000000000000002"],
+  INSUFFICIENT_FUNDS: ["4000000000009995"],
+  EXPIRED_CARD: ["4000000000000069"],
+};
+
 module.exports = {
   TRANSACTION_TYPES,
   TRANSACTION_STATUS,
@@ -73,4 +157,6 @@ module.exports = {
   PAGINATION,
   JWT_CONFIG,
   RATE_LIMIT,
+  SUBSCRIPTION_PLANS,
+  FAKE_PAYMENT_CARDS,
 };

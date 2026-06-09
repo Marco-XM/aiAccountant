@@ -23,10 +23,6 @@ dist-ssr
 *.sln
 *.sw?
 
-# Environment variables (secrets)
-.env
-.env.*
-!.env.example
 
 # Local uploads and test artifacts (do not commit)
 /backend/uploads/
@@ -35,5 +31,10 @@ dist-ssr
 /backend/probe.*
 
 # Frontend local env and build
-/frontend/.env.local
 /frontend/dist/
+
+# Environment secrets — never commit
+.env
+.env.*
+backend/.env
+frontend/.env

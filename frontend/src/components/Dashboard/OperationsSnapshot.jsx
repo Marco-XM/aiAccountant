@@ -73,14 +73,14 @@ const OperationsSnapshot = () => {
     <Card title="Operations Snapshot">
       {error && <ErrorBanner message={error} onRetry={fetch} />}
 
-      <p className="text-xs text-slate-400">Recent transactions & pending items</p>
+      <p className="text-xs text-muted">Recent transactions &amp; pending items</p>
 
       <div className="mt-4">
         {loading ? (
           <div className="space-y-3">
-            <div className="h-10 rounded bg-slate-800/40 animate-pulse" />
-            <div className="h-10 rounded bg-slate-800/30 animate-pulse" />
-            <div className="h-10 rounded bg-slate-800/30 animate-pulse" />
+            <div className="h-10 rounded bg-skeleton animate-pulse" />
+            <div className="h-10 rounded bg-skeleton animate-pulse" />
+            <div className="h-10 rounded bg-skeleton animate-pulse" />
           </div>
         ) : (
           <div className="min-h-[120px]">
@@ -90,9 +90,9 @@ const OperationsSnapshot = () => {
       </div>
 
       <div className="mt-4 flex flex-wrap gap-3">
-        <div className="rounded-lg bg-slate-900/40 p-3 text-xs text-slate-300">Pending reconciliations: {stats.pendingReconciliations ?? "-"}</div>
-        <div className="rounded-lg bg-slate-900/40 p-3 text-xs text-slate-300">Uploads in progress: {stats.uploadsInProgress ?? "-"}</div>
-        <div className="rounded-lg bg-slate-900/40 p-3 text-xs text-slate-300">Unreviewed: {stats.unreviewedCount ?? "-"}</div>
+        <div className="rounded-lg bg-surface-alt border border-theme p-3 text-xs text-muted-2">Pending reconciliations: {stats.pendingReconciliations ?? "-"}</div>
+        <div className="rounded-lg bg-surface-alt border border-theme p-3 text-xs text-muted-2">Uploads in progress: {stats.uploadsInProgress ?? "-"}</div>
+        <div className="rounded-lg bg-surface-alt border border-theme p-3 text-xs text-muted-2">Unreviewed: {stats.unreviewedCount ?? "-"}</div>
       </div>
     </Card>
   );

@@ -1,7 +1,8 @@
 import React, { useState, useContext, useRef, useEffect } from "react";
 import toast from "react-hot-toast";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, Link } from "react-router-dom";
 import { AuthContext } from "../../Context/AuthContext";
+import { useSubscription } from "../../Context/SubscriptionContext";
 import { api } from "../../config/api";
 
 const Chatbot = () => {
@@ -24,7 +25,9 @@ const Chatbot = () => {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef(null);
-  const { token } = useContext(AuthContext);
+  const { token, userId } = useContext(AuthContext);
+  const { isAtLimit, usage, planDetails } = useSubscription();
+  const chatAtLimit = isAtLimit("aiChatMessages");
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -72,8 +75,9 @@ const Chatbot = () => {
     }
   };
 
-  const saveChat = async (updatedMessages, newSuggestions) => {
-    if (!currentChatId) return;
+  const saveChat = async (updatedMessages, chatId) => {
+    const id = chatId ?? currentChatId;
+    if (!id) return;
 
     try {
       const firstUserMsg = updatedMessages.find((m) => m.role === "user");
@@ -82,7 +86,7 @@ const Chatbot = () => {
           (firstUserMsg.content.length > 50 ? "..." : "")
         : "New Chat";
 
-      await api.chat.updateSession(currentChatId, {
+      await api.chat.updateSession(id, {
         messages: updatedMessages,
         title,
       });
@@ -110,12 +114,19 @@ const Chatbot = () => {
         const newChatId = response.data._id;
         setCurrentChatId(newChatId);
 
+        // Persist the user message immediately so the session appears in the sidebar right away
+        await saveChat(updatedMessages, newChatId);
+
         // Continue with sending message
         await sendMessageToAI(updatedMessages, newChatId);
       } catch (error) {
-        // API interceptor handles user-facing error toast.
-        console.error("Error creating chat:", error);
-        setIsLoading(false);
+        // Session storage unavailable (e.g. local/dev account) — still send the message without a session
+        if (error?.response?.status === 503 || error?.code === "BACKEND_UNAVAILABLE") {
+          await sendMessageToAI(updatedMessages, null);
+        } else {
+          console.error("Error creating chat session:", error);
+          setIsLoading(false);
+        }
       }
     } else {
       await sendMessageToAI(updatedMessages, currentChatId);
@@ -139,7 +150,7 @@ const Chatbot = () => {
       const newMessages = [...updatedMessages, aiMessage];
       setMessages(newMessages);
 
-      await saveChat(newMessages);
+      await saveChat(newMessages, chatId);
     } catch (error) {
       // API interceptor handles user-facing error toast.
       console.error("Error sending message:", error);
@@ -271,12 +282,12 @@ const Chatbot = () => {
             {rows.map((row, rowIdx) => (
               <tr
                 key={rowIdx}
-                className={rowIdx % 2 === 0 ? "bg-gray-50" : "bg-white"}
+                className={rowIdx % 2 === 0 ? "bg-surface-alt" : "bg-surface"}
               >
                 {row.map((cell, cellIdx) => (
                   <td
                     key={cellIdx}
-                    className="px-4 py-3 text-sm text-gray-700 border-t border-gray-200"
+                    className="px-4 py-3 text-sm text-ink border-t border-theme"
                   >
                     {processCellContent(cell)}
                   </td>
@@ -296,7 +307,7 @@ const Chatbot = () => {
     if (line.trim().startsWith("##")) {
       const headerText = line.replace(/^##\s*/, "");
       return (
-        <h2 key={idx} className="text-lg font-bold text-gray-900 mt-4 mb-2">
+        <h2 key={idx} className="text-lg font-bold text-ink-2 mt-4 mb-2">
           {processBoldText(headerText)}
         </h2>
       );
@@ -332,7 +343,7 @@ const Chatbot = () => {
         parts.push(text.substring(lastIndex, match.index));
       }
       parts.push(
-        <strong key={match.index} className="font-bold text-gray-900">
+        <strong key={match.index} className="font-bold text-ink-2">
           {match[1]}
         </strong>
       );
@@ -347,7 +358,7 @@ const Chatbot = () => {
   };
 
   return (
-    <div className="h-full flex flex-col bg-gradient-to-br from-gray-50 to-gray-100">
+    <div className="h-full flex flex-col bg-[color:var(--ui-bg)]">
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
@@ -361,8 +372,8 @@ const Chatbot = () => {
                 <div
                   className={`max-w-3xl rounded-2xl p-5 shadow-md ${
                     msg.role === "user"
-                      ? "bg-gradient-to-br from-blue-600 to-purple-600 text-white ml-auto"
-                      : "bg-white text-gray-900 border border-gray-200"
+                      ? "bg-gradient-to-br from-[#0A2463] to-[#3E92CC] text-white ml-auto"
+                      : "bg-surface text-ink border border-theme"
                   }`}
                   style={{ maxWidth: "85%" }}
                 >
@@ -406,7 +417,7 @@ const Chatbot = () => {
                       className="max-w-3xl w-full"
                       style={{ maxWidth: "85%" }}
                     >
-                      <p className="text-xs font-medium text-gray-600 mb-2 flex items-center">
+                      <p className="text-xs font-medium text-muted mb-2 flex items-center">
                         <svg
                           className="w-3 h-3 mr-1 text-blue-600"
                           fill="none"
@@ -429,9 +440,9 @@ const Chatbot = () => {
                             <button
                               key={idx}
                               onClick={() => setInput(question)}
-                              className="text-left text-xs px-3 py-2 bg-white hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50 border border-gray-200 hover:border-blue-300 rounded-lg text-gray-700 transition-all duration-200 hover:shadow-md group"
+                              className="text-left text-xs px-3 py-2 bg-surface hover:bg-surface-alt border border-theme hover:border-[color:var(--ui-accent)] rounded-lg text-ink transition-all duration-200 hover:shadow-md group"
                             >
-                              <span className="font-medium group-hover:text-blue-600">
+                              <span className="font-medium group-hover:text-accent">
                                 {question}
                               </span>
                             </button>
@@ -445,7 +456,7 @@ const Chatbot = () => {
 
           {isLoading && (
             <div className="flex justify-start animate-fadeIn">
-              <div className="bg-white rounded-2xl p-5 shadow-md border border-gray-200">
+              <div className="bg-surface rounded-2xl p-5 shadow-md border border-theme">
                 <div className="flex items-center space-x-3">
                   <div className="bg-gradient-to-br from-blue-100 to-purple-100 p-2 rounded-lg">
                     <svg
@@ -476,7 +487,7 @@ const Chatbot = () => {
                       style={{ animationDelay: "300ms" }}
                     ></div>
                   </div>
-                  <span className="text-sm text-gray-500">
+                  <span className="text-sm text-muted">
                     Analyzing your data...
                   </span>
                 </div>
@@ -488,7 +499,13 @@ const Chatbot = () => {
         </div>
 
         {/* Input */}
-        <div className="border-t border-gray-200 p-4 md:p-6 bg-white flex-shrink-0">
+        <div className="border-t border-theme p-4 md:p-6 bg-surface flex-shrink-0">
+          {chatAtLimit && (
+            <div className="mb-3 rounded-xl px-4 py-3 text-sm font-medium flex items-center justify-between" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", color: "#dc2626" }}>
+              <span>You've used all your AI chat messages for this month ({usage.aiChatMessages || 0}/{planDetails?.limits?.aiChatMessages}).</span>
+              <Link to={`/app/${userId}/subscription`} className="ml-3 shrink-0 underline font-semibold hover:opacity-80">Upgrade plan</Link>
+            </div>
+          )}
           <div className="flex items-end space-x-3">
             <div className="flex-1 relative">
               <textarea
@@ -496,19 +513,19 @@ const Chatbot = () => {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder="Ask me anything about your finances..."
-                className="w-full p-4 pr-12 border-2 border-gray-300 rounded-xl resize-none focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 text-gray-900 transition-all"
+                className="w-full p-4 pr-12 border-2 border-theme rounded-xl resize-none focus:outline-none focus:border-[color:var(--ui-accent)] focus:ring-2 focus:ring-[color:var(--ui-focus)] text-ink bg-surface transition-all"
                 rows="2"
                 disabled={isLoading}
               />
               {input.length > 0 && (
-                <div className="absolute bottom-3 right-3 text-xs text-gray-400">
+                <div className="absolute bottom-3 right-3 text-xs text-muted">
                   {input.length} chars
                 </div>
               )}
             </div>
             <button
               onClick={handleSend}
-              disabled={!input.trim() || isLoading}
+              disabled={!input.trim() || isLoading || chatAtLimit}
               className="px-6 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center justify-center"
             >
               <svg
@@ -526,7 +543,7 @@ const Chatbot = () => {
               </svg>
             </button>
           </div>
-          <p className="text-xs text-gray-500 mt-2 text-center flex items-center justify-center">
+          <p className="text-xs text-muted mt-2 text-center flex items-center justify-center">
             <svg
               className="w-3 h-3 mr-1"
               fill="none"

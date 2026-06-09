@@ -77,7 +77,7 @@ const ResetPassword = () => {
 
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
-          <h2 className="text-4xl font-extrabold text-gray-900 mb-2">
+          <h2 className="text-4xl font-extrabold text-ink-2 mb-2">
             Reset Password
           </h2>
           <p className="text-[color:var(--ui-ink-2)]">
@@ -101,7 +101,7 @@ const ResetPassword = () => {
           <div className="ui-card ui-card-strong p-8 space-y-6">
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-ink mb-2">
                   New Password
                 </label>
                 <input
@@ -122,7 +122,7 @@ const ResetPassword = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-ink mb-2">
                   Confirm Password
                 </label>
                 <input

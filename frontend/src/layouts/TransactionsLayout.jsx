@@ -8,8 +8,8 @@ const TransactionsLayout = ({ children }) => {
         <header className={TransactionsTheme.header}>
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-lg font-bold text-white">Transactions</h1>
-              <p className="text-xs text-slate-400">Operational workspace for review and reconciliation</p>
+              <h1 className="text-lg font-bold text-ink-2">Transactions</h1>
+              <p className="text-xs text-muted">Operational workspace for review and reconciliation</p>
             </div>
             <div className="flex items-center gap-2">
               {/* Import / reconcile actions */}

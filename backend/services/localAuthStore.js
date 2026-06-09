@@ -96,10 +96,30 @@ const saveUser = async (updatedUser) => {
   return updatedUser;
 };
 
+const getAllUsers = async () => {
+  const users = await readStore();
+  return users.map((u) => ({
+    id: u.id,
+    name: u.name,
+    email: u.email,
+    businessType: u.businessType,
+    createdAt: u.createdAt,
+    updatedAt: u.updatedAt,
+  }));
+};
+
+const deleteUser = async (id) => {
+  const users = await readStore();
+  const filtered = users.filter((u) => u.id !== id);
+  await writeStore(filtered);
+};
+
 module.exports = {
   createUser,
   findUserByEmail,
   findUserByResetTokenHash,
   saveUser,
   toPublicUser,
+  getAllUsers,
+  deleteUser,
 };

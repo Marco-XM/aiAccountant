@@ -1,4 +1,5 @@
 const legacy = require("./chartController");
+const usageService = require("../services/usageService");
 
 // Adapter controller that will host the redesigned AI Charts APIs.
 // For now delegate to existing implementations; this file is the
@@ -10,6 +11,15 @@ const getWorkspace = async (req, res) => {
 };
 
 const generate = async (req, res) => {
+  // Wrap res.json so we can detect success and increment usage
+  const originalJson = res.json.bind(res);
+  res.json = function (body) {
+    // Increment after the successful response (fire-and-forget)
+    if (res.statusCode < 400) {
+      usageService.increment(req.user?._id, "aiChartGenerations").catch(() => {});
+    }
+    return originalJson(body);
+  };
   return legacy.generateChart(req, res);
 };
 

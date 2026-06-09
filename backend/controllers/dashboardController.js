@@ -214,11 +214,27 @@ const calculateDashboard = (transactions = []) => {
       reconciliation: reconciliationCount,
       duplicateCount,
       uncategorized: rows.filter((row) => row.category === "Uncategorized").length,
-      reminders: [
-        { title: "Month-end close", due: "3 days", priority: "High" },
-        { title: "Review tax reserve", due: "This week", priority: "Medium" },
-        { title: "Export CFO packet", due: "Friday", priority: "Medium" },
-      ],
+      reminders: (() => {
+        const items = [];
+        const today = new Date();
+        const daysToMonthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate() - today.getDate();
+        if (daysToMonthEnd <= 7) {
+          items.push({ title: "Month-end close", due: `${daysToMonthEnd} day${daysToMonthEnd === 1 ? "" : "s"}`, priority: "High" });
+        }
+        if (pendingCount > 0) {
+          items.push({ title: `Review ${pendingCount} pending transaction${pendingCount === 1 ? "" : "s"}`, due: "Now", priority: "High" });
+        }
+        if (duplicateCount > 0) {
+          items.push({ title: `Clear ${duplicateCount} duplicate${duplicateCount === 1 ? "" : "s"}`, due: "This week", priority: "Medium" });
+        }
+        if (taxEstimate > 0) {
+          items.push({ title: "Set aside tax reserve", due: "This month", priority: "Medium" });
+        }
+        if (reconciliationCount > pendingCount) {
+          items.push({ title: "Reconcile flagged transactions", due: "This week", priority: "Medium" });
+        }
+        return items;
+      })(),
       tasks: [
         { title: "Approve pending transactions", count: pendingCount },
         { title: "Reconcile bank feed", count: reconciliationCount },
@@ -257,4 +273,5 @@ const getDashboardOverview = async (req, res) => {
 
 module.exports = {
   getDashboardOverview,
+  calculateDashboard,
 };

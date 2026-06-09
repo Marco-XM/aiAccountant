@@ -2,11 +2,11 @@ import React from "react";
 
 const Card = ({ title, children, className = "", headerRight = null }) => {
   return (
-    <div className={`min-w-0 w-full rounded-2xl bg-slate-950/50 p-4 border border-white/6 shadow-sm ${className}`}>
+    <div className={`min-w-0 w-full ui-card p-4 ${className}`}>
       {title && (
         <div className="flex items-start justify-between mb-3">
           <div>
-            <h4 className="text-sm font-semibold text-white">{title}</h4>
+            <h4 className="text-sm font-semibold text-ink-2">{title}</h4>
           </div>
           {headerRight}
         </div>

@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   Area,
   AreaChart,
@@ -22,6 +23,8 @@ import {
 } from "recharts";
 import toast from "react-hot-toast";
 import { api } from "../../config/api";
+import { AuthContext } from "../../Context/AuthContext";
+import { useSubscription } from "../../Context/SubscriptionContext";
 
 const palette = [
   "#00c2ff",
@@ -74,7 +77,7 @@ const toCompact = (value) => compact.format(Number(value || 0));
 
 const Card = ({ children, className = "" }) => (
   <section
-    className={`rounded-3xl border border-white/15 bg-slate-950/55 shadow-[0_24px_90px_rgba(2,6,23,0.38)] backdrop-blur-xl ${className}`}
+    className={`rounded-3xl border border-theme bg-surface shadow-[0_8px_40px_rgba(0,0,0,0.08)] backdrop-blur-xl ${className}`}
     style={{ fontFamily: "Space Grotesk, Manrope, Segoe UI, sans-serif" }}
   >
     {children}
@@ -90,11 +93,11 @@ const KpiTile = ({ label, value, delta, tone = "cyan" }) => {
   };
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-slate-900/55 px-4 py-3">
+    <div className="relative overflow-hidden rounded-2xl border border-theme bg-surface-alt px-4 py-3">
       <div className={`pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${toneClass[tone] || toneClass.cyan}`} />
-      <p className="text-xs uppercase tracking-[0.24em] text-slate-400">{label}</p>
-      <p className="mt-2 text-2xl font-semibold text-white">{value}</p>
-      <p className="mt-2 text-xs text-slate-400">{delta}</p>
+      <p className="text-xs uppercase tracking-[0.24em] text-muted">{label}</p>
+      <p className="mt-2 text-2xl font-semibold text-ink">{value}</p>
+      <p className="mt-2 text-xs text-muted">{delta}</p>
     </div>
   );
 };
@@ -117,7 +120,7 @@ const Heatmap = ({ matrix = [] }) => {
     <div className="grid grid-cols-[64px_1fr] gap-2">
       <div className="space-y-2 pt-1">
         {matrix.map((row) => (
-          <div key={row.day} className="h-6 text-xs text-slate-400">
+          <div key={row.day} className="h-6 text-xs text-muted">
             {row.day}
           </div>
         ))}
@@ -128,7 +131,7 @@ const Heatmap = ({ matrix = [] }) => {
             {row.weeks.map((week) => (
               <div
                 key={`${row.day}-${week.weekIndex}`}
-                className="h-6 rounded-md border border-white/10"
+                className="h-6 rounded-md border border-theme"
                 style={{ background: getBg(week.value) }}
                 title={`${row.day} / Week ${week.weekIndex + 1}: ${toCurrency(week.value)}`}
               />
@@ -142,7 +145,7 @@ const Heatmap = ({ matrix = [] }) => {
 
 const ChartRenderer = ({ chart, widgetTitle }) => {
   if (!chart) {
-    return <p className="text-sm text-slate-400">No chart selected yet.</p>;
+    return <p className="text-sm text-muted">No chart selected yet.</p>;
   }
 
   const title = widgetTitle || chart.title || "Analytics View";
@@ -152,14 +155,14 @@ const ChartRenderer = ({ chart, widgetTitle }) => {
   const commonAxes = (
     <>
       <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.15)" />
-      <XAxis dataKey={chart.xKey || "label"} stroke="rgba(203,213,225,0.8)" tick={{ fontSize: 12 }} />
-      <YAxis stroke="rgba(203,213,225,0.8)" tick={{ fontSize: 12 }} />
+      <XAxis dataKey={chart.xKey || "label"} stroke="rgba(148,163,184,0.5)" tick={{ fontSize: 12 }} />
+      <YAxis stroke="rgba(148,163,184,0.5)" tick={{ fontSize: 12 }} />
       <Tooltip
         contentStyle={{
           borderRadius: 12,
-          border: "1px solid rgba(255,255,255,0.15)",
-          background: "rgba(2,6,23,0.95)",
-          color: "#f8fafc",
+          border: "1px solid var(--ui-border)",
+          background: "var(--ui-surface)",
+          color: "var(--ui-ink)",
         }}
       />
       <Legend />
@@ -169,11 +172,11 @@ const ChartRenderer = ({ chart, widgetTitle }) => {
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="text-lg font-semibold text-white">{title}</h3>
-        <p className="text-xs text-slate-400">{chart.description || "Dynamic chart generated from your live accounting data."}</p>
+        <h3 className="text-lg font-semibold text-ink">{title}</h3>
+        <p className="text-xs text-muted">{chart.description || "Dynamic chart generated from your live accounting data."}</p>
       </div>
 
-      <div className="h-[420px] rounded-2xl border border-white/10 bg-slate-950/40 p-3">
+      <div className="h-[420px] rounded-2xl border border-theme bg-surface-alt p-3">
         {type === "bar" || type === "stackedBar" ? (
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data} margin={{ top: 12, right: 14, left: 6, bottom: 8 }}>
@@ -237,9 +240,9 @@ const ChartRenderer = ({ chart, widgetTitle }) => {
               <Tooltip
                 contentStyle={{
                   borderRadius: 12,
-                  border: "1px solid rgba(255,255,255,0.15)",
-                  background: "rgba(2,6,23,0.95)",
-                  color: "#f8fafc",
+                  border: "1px solid var(--ui-border)",
+                  background: "var(--ui-surface)",
+                  color: "var(--ui-ink)",
                 }}
               />
               <Legend />
@@ -267,18 +270,18 @@ const ChartRenderer = ({ chart, widgetTitle }) => {
               <XAxis
                 type="number"
                 dataKey={chart.xKey || "x"}
-                stroke="rgba(203,213,225,0.8)"
+                stroke="rgba(148,163,184,0.5)"
                 tickFormatter={(value) => dateFmt(value)}
                 domain={["auto", "auto"]}
               />
-              <YAxis type="number" dataKey={chart.yKey || "y"} stroke="rgba(203,213,225,0.8)" />
+              <YAxis type="number" dataKey={chart.yKey || "y"} stroke="rgba(148,163,184,0.5)" />
               <Tooltip
                 cursor={{ strokeDasharray: "3 3" }}
                 contentStyle={{
                   borderRadius: 12,
-                  border: "1px solid rgba(255,255,255,0.15)",
-                  background: "rgba(2,6,23,0.95)",
-                  color: "#f8fafc",
+                  border: "1px solid var(--ui-border)",
+                  background: "var(--ui-surface)",
+                  color: "var(--ui-ink)",
                 }}
                 formatter={(value, key, payload) => {
                   if (key === "y") return [toCurrency(value), "Signed amount"];
@@ -312,32 +315,32 @@ const ChartRenderer = ({ chart, widgetTitle }) => {
 const SavedReports = ({ reports, onLoad, onDelete }) => (
   <Card className="p-4">
     <div className="flex items-center justify-between">
-      <h3 className="text-sm font-semibold uppercase tracking-[0.24em] text-cyan-200">Saved reports</h3>
-      <span className="rounded-full border border-white/15 px-2 py-1 text-[11px] text-slate-300">{reports.length}</span>
+      <h3 className="text-sm font-semibold uppercase tracking-[0.24em] text-accent">Saved reports</h3>
+      <span className="rounded-full border border-theme px-2 py-1 text-[11px] text-muted-2">{reports.length}</span>
     </div>
 
     <div className="mt-4 space-y-2">
       {reports.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-white/20 p-4 text-xs text-slate-400">
+        <div className="rounded-xl border border-dashed border-theme p-4 text-xs text-muted">
           No saved reports yet. Generate a chart and save it for stakeholders.
         </div>
       ) : (
         reports.map((report) => (
-          <div key={report.id} className="rounded-xl border border-white/10 bg-slate-900/55 p-3">
-            <p className="text-sm font-medium text-white">{report.title}</p>
-            <p className="mt-1 text-xs text-slate-400">{dateFmt(report.createdAt)}</p>
+          <div key={report.id} className="rounded-xl border border-theme bg-surface-alt p-3">
+            <p className="text-sm font-medium text-ink">{report.title}</p>
+            <p className="mt-1 text-xs text-muted">{dateFmt(report.createdAt)}</p>
             <div className="mt-3 flex gap-2">
               <button
                 type="button"
                 onClick={() => onLoad(report)}
-                className="rounded-lg border border-cyan-400/30 bg-cyan-500/10 px-3 py-1 text-xs text-cyan-200"
+                className="rounded-lg border border-cyan-400/30 bg-cyan-500/10 px-3 py-1 text-xs text-cyan-600 dark:text-cyan-200"
               >
                 Open
               </button>
               <button
                 type="button"
                 onClick={() => onDelete(report.id)}
-                className="rounded-lg border border-rose-400/30 bg-rose-500/10 px-3 py-1 text-xs text-rose-200"
+                className="rounded-lg border border-rose-400/30 bg-rose-500/10 px-3 py-1 text-xs text-rose-600 dark:text-rose-200"
               >
                 Delete
               </button>
@@ -350,6 +353,9 @@ const SavedReports = ({ reports, onLoad, onDelete }) => (
 );
 
 const ChartGenerator = () => {
+  const { userId } = useContext(AuthContext);
+  const { isAtLimit, usage, planDetails } = useSubscription();
+  const chartAtLimit = isAtLimit("aiChartGenerations");
   const [workspace, setWorkspace] = useState(null);
   const [reports, setReports] = useState([]);
   const [loadingWorkspace, setLoadingWorkspace] = useState(true);
@@ -507,10 +513,10 @@ const ChartGenerator = () => {
 
   const renderInsights = (
     <Card className="p-5">
-      <h3 className="text-sm font-semibold uppercase tracking-[0.24em] text-fuchsia-200">AI insights</h3>
+      <h3 className="text-sm font-semibold uppercase tracking-[0.24em] text-accent">AI insights</h3>
       <div className="mt-4 space-y-3">
         {(result?.insights || workspace?.quickInsights || []).map((line, index) => (
-          <div key={`${line}-${index}`} className="rounded-xl border border-white/10 bg-slate-900/55 p-3 text-sm text-slate-100">
+          <div key={`${line}-${index}`} className="rounded-xl border border-theme bg-surface-alt p-3 text-sm text-ink">
             {line}
           </div>
         ))}
@@ -518,24 +524,24 @@ const ChartGenerator = () => {
 
       {!!result?.recommendations?.length && (
         <div className="mt-4 space-y-2">
-          <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Recommendations</p>
+          <p className="text-xs uppercase tracking-[0.2em] text-muted">Recommendations</p>
           {result.recommendations.map((line, index) => (
-            <p key={`${line}-${index}`} className="text-sm text-slate-300">{line}</p>
+            <p key={`${line}-${index}`} className="text-sm text-muted-2">{line}</p>
           ))}
         </div>
       )}
 
       {!!result?.anomalies?.length && (
         <div className="mt-4">
-          <p className="text-xs uppercase tracking-[0.2em] text-rose-300">Anomaly detections</p>
+          <p className="text-xs uppercase tracking-[0.2em] text-danger">Anomaly detections</p>
           <div className="mt-2 space-y-2">
             {result.anomalies.slice(0, 4).map((item) => (
-              <div key={item.id} className="rounded-xl border border-rose-400/25 bg-rose-500/10 p-3 text-xs text-rose-100">
+              <div key={item.id} className="rounded-xl border border-rose-400/25 bg-rose-500/10 p-3 text-xs text-rose-700 dark:text-rose-100">
                 <div className="flex items-center justify-between gap-3">
                   <span>{item.category || "Uncategorized"}</span>
                   <span>{toCurrency(item.amount)}</span>
                 </div>
-                <p className="mt-1 text-rose-200/90">{item.desc || item.vendor || "Potential outlier"}</p>
+                <p className="mt-1 text-rose-600 dark:text-rose-200/90">{item.desc || item.vendor || "Potential outlier"}</p>
               </div>
             ))}
           </div>
@@ -557,12 +563,8 @@ const ChartGenerator = () => {
 
   return (
     <div
-      className="min-h-screen px-5 py-6 text-slate-100"
-      style={{
-        background:
-          "radial-gradient(circle at 0% 0%, rgba(14,165,233,0.18), transparent 36%), radial-gradient(circle at 100% 0%, rgba(217,70,239,0.14), transparent 32%), linear-gradient(180deg, #020617 0%, #020617 44%, #030b1f 100%)",
-        fontFamily: "Space Grotesk, Manrope, Segoe UI, sans-serif",
-      }}
+      className="min-h-screen px-5 py-6 text-ink"
+      style={{ fontFamily: "Space Grotesk, Manrope, Segoe UI, sans-serif" }}
     >
       <div className="mx-auto max-w-[1600px] space-y-5">
         <Card className="relative overflow-hidden p-6">
@@ -571,20 +573,20 @@ const ChartGenerator = () => {
 
           <div className="flex flex-wrap items-start justify-between gap-5">
             <div>
-              <p className="text-xs uppercase tracking-[0.3em] text-cyan-200">AI Financial Analytics Workspace</p>
-              <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-white">Enterprise AI Charts</h1>
-              <p className="mt-2 max-w-3xl text-sm text-slate-300">
+              <p className="text-xs uppercase tracking-[0.3em] text-accent">AI Financial Analytics Workspace</p>
+              <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-ink">Enterprise AI Charts</h1>
+              <p className="mt-2 max-w-3xl text-sm text-muted-2">
                 Build investor-grade financial narratives from your real accounting data using natural language, dynamic chart intelligence, anomaly detection, and forecasting.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={fullscreenChart} className="rounded-xl border border-white/20 bg-white/5 px-4 py-2 text-sm text-white">
+              <button type="button" onClick={fullscreenChart} className="rounded-xl border border-theme bg-surface-alt px-4 py-2 text-sm text-ink-2">
                 Fullscreen
               </button>
-              <button type="button" onClick={exportJson} className="rounded-xl border border-cyan-400/30 bg-cyan-500/10 px-4 py-2 text-sm text-cyan-100">
+              <button type="button" onClick={exportJson} className="rounded-xl border border-cyan-400/30 bg-cyan-500/10 px-4 py-2 text-sm text-cyan-700 dark:text-cyan-100">
                 Export
               </button>
-              <button type="button" onClick={onSaveReport} className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-100">
+              <button type="button" onClick={onSaveReport} className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-700 dark:text-emerald-100">
                 Save Report
               </button>
             </div>
@@ -601,23 +603,29 @@ const ChartGenerator = () => {
         <div className="grid gap-5 xl:grid-cols-[1.3fr_0.7fr]">
           <Card className="p-5">
             <div className="flex items-center justify-between gap-4">
-              <h2 className="text-sm font-semibold uppercase tracking-[0.24em] text-cyan-200">Ask AI</h2>
-              <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-slate-300">Real transaction-aware</span>
+              <h2 className="text-sm font-semibold uppercase tracking-[0.24em] text-accent">Ask AI</h2>
+              <span className="rounded-full border border-theme px-3 py-1 text-xs text-muted-2">Real transaction-aware</span>
             </div>
 
             <div className="mt-4 flex flex-col gap-3 md:flex-row">
+              {chartAtLimit && (
+                <div className="mb-1 rounded-xl px-4 py-3 text-sm font-medium flex items-center justify-between" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", color: "#dc2626" }}>
+                  <span>You've used all your AI chart generations for this month ({usage.aiChartGenerations || 0}/{planDetails?.limits?.aiChartGenerations}).</span>
+                  <Link to={`/app/${userId}/subscription`} className="ml-3 shrink-0 underline font-semibold hover:opacity-80">Upgrade plan</Link>
+                </div>
+              )}
               <textarea
                 value={prompt}
                 onChange={(event) => setPrompt(event.target.value)}
                 placeholder="Show software spending trend and flag unusual spikes"
-                className="min-h-[110px] flex-1 rounded-2xl border border-white/15 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-cyan-400"
+                className="min-h-[110px] flex-1 rounded-2xl border border-theme bg-surface-alt px-4 py-3 text-sm text-ink outline-none placeholder:text-[color:var(--ui-muted)] focus:border-[color:var(--ui-accent)]"
               />
 
               <div className="grid w-full gap-2 md:w-[220px]">
                 <select
                   value={filters.dateRange}
                   onChange={(event) => setFilters((current) => ({ ...current, dateRange: event.target.value }))}
-                  className="rounded-xl border border-white/15 bg-slate-950/60 px-3 py-2 text-sm text-slate-200"
+                  className="rounded-xl border border-theme bg-surface-alt px-3 py-2 text-sm text-ink"
                 >
                   <option value="30d">Last 30 days</option>
                   <option value="90d">Last 90 days</option>
@@ -629,7 +637,7 @@ const ChartGenerator = () => {
                 <select
                   value={filters.type}
                   onChange={(event) => setFilters((current) => ({ ...current, type: event.target.value }))}
-                  className="rounded-xl border border-white/15 bg-slate-950/60 px-3 py-2 text-sm text-slate-200"
+                  className="rounded-xl border border-theme bg-surface-alt px-3 py-2 text-sm text-ink"
                 >
                   <option value="all">All transaction types</option>
                   <option value="income">Income only</option>
@@ -640,7 +648,7 @@ const ChartGenerator = () => {
                 <select
                   value={filters.category}
                   onChange={(event) => setFilters((current) => ({ ...current, category: event.target.value }))}
-                  className="rounded-xl border border-white/15 bg-slate-950/60 px-3 py-2 text-sm text-slate-200"
+                  className="rounded-xl border border-theme bg-surface-alt px-3 py-2 text-sm text-ink"
                 >
                   {categories.map((item) => (
                     <option key={item} value={item}>
@@ -651,7 +659,7 @@ const ChartGenerator = () => {
 
                 <button
                   type="button"
-                  disabled={generating || loadingWorkspace}
+                  disabled={generating || loadingWorkspace || chartAtLimit}
                   onClick={() => runGeneration(prompt)}
                   className="rounded-xl border border-cyan-400/30 bg-cyan-500/20 px-3 py-2 text-sm font-semibold text-cyan-100 disabled:opacity-50"
                 >
@@ -669,7 +677,7 @@ const ChartGenerator = () => {
                     setPrompt(item);
                     runGeneration(item);
                   }}
-                  className="rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-slate-200 hover:border-cyan-400/40"
+                  className="rounded-full border border-theme bg-surface-alt px-3 py-1.5 text-xs text-ink hover:border-[color:var(--ui-accent)]"
                 >
                   {item}
                 </button>
@@ -682,18 +690,18 @@ const ChartGenerator = () => {
 
         {workspace?.suggestedCharts?.length ? (
           <Card className="p-5">
-            <h3 className="text-sm font-semibold uppercase tracking-[0.24em] text-cyan-200">Suggested charts</h3>
+            <h3 className="text-sm font-semibold uppercase tracking-[0.24em] text-accent">Suggested charts</h3>
             <div className="mt-4 grid gap-3 md:grid-cols-3">
               {workspace.suggestedCharts.map((widget) => (
                 <button
                   key={widget.id}
                   type="button"
                   onClick={() => setSelectedWidget(widget)}
-                  className={`rounded-2xl border p-4 text-left transition ${selectedWidget?.id === widget.id ? "border-cyan-300/60 bg-cyan-500/10" : "border-white/10 bg-slate-900/45 hover:border-cyan-500/30"}`}
+                  className={`rounded-2xl border p-4 text-left transition ${selectedWidget?.id === widget.id ? "border-cyan-300/60 bg-cyan-500/10" : "border-theme bg-surface-alt hover:border-[color:var(--ui-accent)]"}`}
                 >
-                  <p className="text-sm font-semibold text-white">{widget.title}</p>
-                  <p className="mt-1 text-xs text-slate-400">{widget.subtitle}</p>
-                  <p className="mt-3 text-[11px] uppercase tracking-[0.2em] text-cyan-300">{widget.type}</p>
+                  <p className="text-sm font-semibold text-ink">{widget.title}</p>
+                  <p className="mt-1 text-xs text-muted">{widget.subtitle}</p>
+                  <p className="mt-3 text-[11px] uppercase tracking-[0.2em] text-accent">{widget.type}</p>
                 </button>
               ))}
             </div>
@@ -718,41 +726,41 @@ const ChartGenerator = () => {
 
         <Card className="p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h3 className="text-sm font-semibold uppercase tracking-[0.24em] text-cyan-200">Dataset intelligence</h3>
+            <h3 className="text-sm font-semibold uppercase tracking-[0.24em] text-accent">Dataset intelligence</h3>
             <button
               type="button"
               onClick={loadWorkspace}
               disabled={loadingWorkspace}
-              className="rounded-xl border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-slate-200 disabled:opacity-50"
+              className="rounded-xl border border-theme bg-surface-alt px-3 py-1.5 text-xs text-muted disabled:opacity-50"
             >
               Refresh profile
             </button>
           </div>
 
           <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-xl border border-white/10 bg-slate-900/55 p-3">
-              <p className="text-xs text-slate-400">Rows available</p>
-              <p className="mt-2 text-xl font-semibold text-white">{toCompact(workspace?.profile?.rowCount || 0)}</p>
+            <div className="rounded-xl border border-theme bg-surface-alt p-3">
+              <p className="text-xs text-muted">Rows available</p>
+              <p className="mt-2 text-xl font-semibold text-ink">{toCompact(workspace?.profile?.rowCount || 0)}</p>
             </div>
-            <div className="rounded-xl border border-white/10 bg-slate-900/55 p-3">
-              <p className="text-xs text-slate-400">Detected columns</p>
-              <p className="mt-2 text-xl font-semibold text-white">{workspace?.profile?.columns?.length || 0}</p>
+            <div className="rounded-xl border border-theme bg-surface-alt p-3">
+              <p className="text-xs text-muted">Detected columns</p>
+              <p className="mt-2 text-xl font-semibold text-ink">{workspace?.profile?.columns?.length || 0}</p>
             </div>
-            <div className="rounded-xl border border-white/10 bg-slate-900/55 p-3">
-              <p className="text-xs text-slate-400">Date range</p>
-              <p className="mt-2 text-sm font-semibold text-white">
+            <div className="rounded-xl border border-theme bg-surface-alt p-3">
+              <p className="text-xs text-muted">Date range</p>
+              <p className="mt-2 text-sm font-semibold text-ink">
                 {workspace?.profile?.dateRange?.from ? `${dateFmt(workspace.profile.dateRange.from)} to ${dateFmt(workspace.profile.dateRange.to)}` : "No date range"}
               </p>
             </div>
-            <div className="rounded-xl border border-white/10 bg-slate-900/55 p-3">
-              <p className="text-xs text-slate-400">Currencies</p>
-              <p className="mt-2 text-sm font-semibold text-white">{(workspace?.profile?.currencies || []).join(", ") || "USD"}</p>
+            <div className="rounded-xl border border-theme bg-surface-alt p-3">
+              <p className="text-xs text-muted">Currencies</p>
+              <p className="mt-2 text-sm font-semibold text-ink">{(workspace?.profile?.currencies || []).join(", ") || "USD"}</p>
             </div>
           </div>
 
-          <div className="mt-4 overflow-x-auto rounded-2xl border border-white/10">
-            <table className="min-w-full divide-y divide-white/10 text-sm">
-              <thead className="bg-slate-900/70 text-xs uppercase tracking-[0.2em] text-slate-400">
+          <div className="mt-4 overflow-x-auto rounded-2xl border border-theme">
+            <table className="min-w-full divide-y divide-[color:var(--ui-border)] text-sm">
+              <thead className="bg-surface-alt text-xs uppercase tracking-[0.2em] text-muted">
                 <tr>
                   <th className="px-3 py-2 text-left">Column</th>
                   <th className="px-3 py-2 text-left">Detected type</th>
@@ -762,7 +770,7 @@ const ChartGenerator = () => {
                   <th className="px-3 py-2 text-right">Nulls</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/5 bg-slate-950/40 text-slate-200">
+              <tbody className="divide-y divide-[color:var(--ui-border)] bg-surface text-ink">
                 {(workspace?.profile?.columns || []).slice(0, 12).map((column) => (
                   <tr key={column.name}>
                     <td className="px-3 py-2">{column.name}</td>

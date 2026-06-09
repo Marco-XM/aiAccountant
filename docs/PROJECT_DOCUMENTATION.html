@@ -1,0 +1,1612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Accountant – Graduation Project | Akhbar El-Youm Academy, Faculty of Computer Science</title>
+  <style>
+    :root {
+      --black:   #000000;
+      --gray-50: #f8f8f8;
+      --gray-100: #f0f0f0;
+      --gray-200: #d8d8d8;
+      --gray-300: #b0b0b0;
+      --gray-400: #888888;
+      --gray-600: #555555;
+      --gray-700: #333333;
+      --gray-800: #1a1a1a;
+      --white:   #ffffff;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--gray-800);
+      background: #fff;
+    }
+
+    /* ── Cover Page ─────────────────────────────────────────────── */
+    .cover {
+      page-break-after: always;
+      min-height: 100vh;
+      background: #111111;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 60px 40px;
+      text-align: center;
+      color: #fff;
+    }
+
+    .cover .logo-box {
+      width: 90px; height: 90px;
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 24px;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 28px;
+      font-size: 40px;
+    }
+
+    .cover h1 {
+      font-size: 44px; font-weight: 800;
+      letter-spacing: -0.5px;
+      margin-bottom: 10px;
+    }
+
+    .cover .subtitle {
+      font-size: 18px; font-weight: 400;
+      opacity: 0.80; margin-bottom: 40px;
+    }
+
+    .cover .meta-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      max-width: 500px;
+      margin: 0 auto 40px;
+    }
+
+    .cover .meta-item {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.22);
+      border-radius: 12px;
+      padding: 14px 16px;
+      text-align: left;
+    }
+
+    .cover .meta-item .label { font-size: 10px; opacity: 0.60; text-transform: uppercase; letter-spacing: 1px; }
+    .cover .meta-item .value { font-size: 14px; font-weight: 600; margin-top: 2px; }
+
+    .cover .badges { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+    .cover .badge {
+      background: rgba(255,255,255,0.10);
+      border: 1px solid rgba(255,255,255,0.30);
+      border-radius: 20px;
+      padding: 5px 14px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    /* ── TOC ────────────────────────────────────────────────────── */
+    .toc-page {
+      page-break-after: always;
+      padding: 50px 60px;
+    }
+
+    .toc-page h2 {
+      font-size: 26px; font-weight: 700;
+      color: var(--black);
+      margin-bottom: 30px;
+      padding-bottom: 12px;
+      border-bottom: 3px solid var(--black);
+    }
+
+    .toc-section { margin-bottom: 6px; }
+    .toc-section a {
+      display: flex; justify-content: space-between;
+      text-decoration: none; color: var(--gray-700);
+      padding: 7px 10px;
+      border-radius: 6px;
+    }
+    .toc-section.main > a { font-weight: 700; font-size: 14px; color: var(--black); }
+    .toc-section.sub > a { padding-left: 28px; font-size: 12.5px; color: var(--gray-600); }
+
+    .toc-dots {
+      flex: 1;
+      border-bottom: 1px dotted var(--gray-300);
+      margin: 0 10px;
+      position: relative; top: -4px;
+    }
+
+    /* ── Sections ───────────────────────────────────────────────── */
+    .section {
+      padding: 40px 60px;
+    }
+
+    .section-header {
+      display: flex; align-items: center; gap: 14px;
+      margin-bottom: 28px;
+      padding-bottom: 14px;
+      border-bottom: 2px solid var(--black);
+    }
+
+    .section-icon {
+      width: 46px; height: 46px;
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+      flex-shrink: 0;
+      background: var(--gray-100);
+      border: 1px solid var(--gray-200);
+    }
+
+    .icon-blue, .icon-green, .icon-purple,
+    .icon-orange, .icon-red, .icon-gray {
+      background: var(--gray-100);
+      border: 1px solid var(--gray-200);
+    }
+
+    .section-header h2 {
+      font-size: 24px; font-weight: 700;
+      color: var(--black);
+    }
+
+    h3 {
+      font-size: 16px; font-weight: 700;
+      color: var(--gray-800);
+      margin: 26px 0 10px;
+      border-bottom: 1px solid var(--gray-200);
+      padding-bottom: 4px;
+    }
+
+    h4 {
+      font-size: 13.5px; font-weight: 600;
+      color: var(--gray-700);
+      margin: 16px 0 8px;
+    }
+
+    p { margin-bottom: 10px; color: var(--gray-700); }
+
+    ul, ol { padding-left: 20px; margin-bottom: 12px; }
+    li { margin-bottom: 4px; color: var(--gray-700); }
+
+    /* ── Cards / Grids ──────────────────────────────────────────── */
+    .card-grid {
+      display: grid;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .card-grid-2 { grid-template-columns: 1fr 1fr; }
+    .card-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+
+    .card {
+      background: var(--gray-50);
+      border: 1px solid var(--gray-200);
+      border-radius: 6px;
+      padding: 16px;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    .card .card-title {
+      font-size: 13px; font-weight: 700;
+      color: var(--gray-800);
+      margin-bottom: 8px;
+      display: flex; align-items: center; gap: 6px;
+    }
+
+    .card p { font-size: 12px; margin: 0; }
+
+    /* ── Code blocks ────────────────────────────────────────────── */
+    code {
+      font-family: 'Cascadia Code', 'Courier New', monospace;
+      font-size: 12px;
+      background: var(--gray-100);
+      border: 1px solid var(--gray-200);
+      border-radius: 4px;
+      padding: 1px 5px;
+      color: var(--black);
+    }
+
+    pre {
+      background: var(--gray-50);
+      color: var(--gray-800);
+      border: 1px solid var(--gray-200);
+      border-radius: 6px;
+      padding: 16px 18px;
+      overflow-x: auto;
+      font-family: 'Cascadia Code', 'Courier New', monospace;
+      font-size: 11.5px;
+      line-height: 1.7;
+      margin: 12px 0;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    pre .kw  { color: #000; font-weight: 700; }
+    pre .str { color: #444; }
+    pre .cm  { color: var(--gray-400); font-style: italic; }
+    pre .fn  { color: #000; }
+    pre .num { color: #000; }
+
+    /* ── Tables ─────────────────────────────────────────────────── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0;
+      font-size: 12px;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    thead tr { background: var(--gray-800); color: #fff; }
+    thead th {
+      padding: 9px 14px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 11.5px;
+      letter-spacing: 0.3px;
+    }
+
+    tbody tr { border-bottom: 1px solid var(--gray-200); }
+    tbody tr:nth-child(even) { background: var(--gray-50); }
+    tbody td { padding: 8px 14px; color: var(--gray-700); }
+
+    /* ── Badges ─────────────────────────────────────────────────── */
+    .badge-pill {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 99px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.2px;
+      background: var(--gray-100);
+      border: 1px solid var(--gray-300);
+      color: var(--gray-700);
+    }
+
+    .badge-blue, .badge-green, .badge-orange,
+    .badge-purple, .badge-gray, .badge-red {
+      background: var(--gray-100);
+      border: 1px solid var(--gray-300);
+      color: var(--gray-700);
+    }
+
+    /* ── Method badges ──────────────────────────────────────────── */
+    .method {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 10.5px;
+      font-weight: 700;
+      font-family: monospace;
+      margin-right: 6px;
+      background: var(--gray-800);
+      color: #fff;
+      min-width: 52px;
+      text-align: center;
+    }
+
+    .method-get    { background: #444; }
+    .method-post   { background: #222; }
+    .method-put    { background: #555; }
+    .method-patch  { background: #666; }
+    .method-delete { background: #888; color: #fff; }
+
+    /* ── API endpoint rows ──────────────────────────────────────── */
+    .endpoint-row {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 9px 12px;
+      border: 1px solid var(--gray-200);
+      border-radius: 6px;
+      margin-bottom: 5px;
+      background: #fff;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    .endpoint-path {
+      font-family: monospace;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--gray-800);
+      flex: 1;
+    }
+
+    .endpoint-desc {
+      font-size: 11.5px;
+      color: var(--gray-600);
+      flex: 2;
+    }
+
+    /* ── Plan comparison ────────────────────────────────────────── */
+    .plan-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 14px;
+      margin: 16px 0;
+    }
+
+    .plan-card {
+      border-radius: 8px;
+      padding: 20px 16px;
+      border: 2px solid var(--gray-300);
+      background: var(--gray-50);
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    .plan-free, .plan-pro, .plan-business {
+      background: var(--gray-50);
+      border-color: var(--gray-300);
+    }
+
+    .plan-card .plan-name { font-size: 17px; font-weight: 800; margin-bottom: 4px; color: var(--black); }
+    .plan-card .plan-price { font-size: 26px; font-weight: 800; margin-bottom: 14px; color: var(--black); }
+    .plan-card .plan-price span { font-size: 13px; font-weight: 400; color: var(--gray-600); }
+    .plan-card ul { list-style: none; padding: 0; }
+    .plan-card ul li { font-size: 12px; padding: 4px 0; border-bottom: 1px solid var(--gray-200); }
+    .plan-card ul li::before { content: '✓  '; font-weight: 700; color: var(--black); }
+
+    /* ── Architecture diagram ───────────────────────────────────── */
+    .arch-box {
+      border: 1px solid var(--gray-300);
+      background: var(--gray-50);
+      border-radius: 8px;
+      padding: 14px 18px;
+      text-align: center;
+      font-weight: 700;
+      font-size: 13px;
+      color: var(--gray-800);
+    }
+
+    .arch-arrow {
+      text-align: center;
+      font-size: 20px;
+      color: var(--gray-400);
+      margin: 4px 0;
+    }
+
+    /* ── Info / Warning boxes ───────────────────────────────────── */
+    .info-box {
+      border-radius: 6px;
+      padding: 12px 16px;
+      margin: 12px 0;
+      display: flex; gap: 12px; align-items: flex-start;
+      background: var(--gray-50);
+      border: 1px solid var(--gray-200);
+      border-left: 4px solid var(--gray-600);
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    .info-box.info, .info-box.warn,
+    .info-box.success, .info-box.danger {
+      background: var(--gray-50);
+      border: 1px solid var(--gray-200);
+      border-left: 4px solid var(--gray-700);
+    }
+
+    .info-box .icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+    .info-box .text { font-size: 12.5px; color: var(--gray-700); }
+    .info-box .text strong { display: block; margin-bottom: 3px; color: var(--gray-800); }
+
+    /* ── File tree ──────────────────────────────────────────────── */
+    .file-tree {
+      background: var(--gray-50);
+      border: 1px solid var(--gray-200);
+      border-radius: 6px;
+      padding: 16px 18px;
+      font-family: 'Cascadia Code', 'Courier New', monospace;
+      font-size: 11.5px;
+      line-height: 1.8;
+      color: var(--gray-800);
+    }
+
+    .file-tree .dir        { color: var(--black);  font-weight: 700; }
+    .file-tree .file       { color: var(--gray-700); }
+    .file-tree .file-js,
+    .file-tree .file-jsx,
+    .file-tree .file-json  { color: var(--gray-700); }
+
+    /* ── Print / PDF ────────────────────────────────────────────── */
+    @media print {
+      pre   { page-break-inside: avoid; break-inside: avoid; }
+      table { page-break-inside: avoid; break-inside: avoid; }
+      .card { page-break-inside: avoid; break-inside: avoid; }
+      .endpoint-row { page-break-inside: avoid; break-inside: avoid; }
+      .info-box { page-break-inside: avoid; break-inside: avoid; }
+      .no-break { page-break-inside: avoid; break-inside: avoid; }
+    }
+
+    /* ── Footer ─────────────────────────────────────────────────── */
+    .page-footer {
+      margin-top: 36px;
+      padding-top: 14px;
+      border-top: 1px solid var(--gray-200);
+      font-size: 11px;
+      color: var(--gray-600);
+      display: flex;
+      justify-content: space-between;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════════
+     COVER PAGE
+══════════════════════════════════════════════════════════════════ -->
+<div class="cover">
+  <div style="font-size: 15px; font-weight: 600; opacity: 0.82; letter-spacing: 0.6px; margin-bottom: 4px;">Akhbar El-Youm Academy</div>
+  <div style="font-size: 12px; opacity: 0.65; margin-bottom: 36px; letter-spacing: 0.3px;">Faculty of Computer Science &amp; Information Technology</div>
+
+  <div class="logo-box">💼</div>
+  <h1>AI Accountant</h1>
+  <p class="subtitle">An Intelligent Financial Management System</p>
+  <p style="font-size: 12.5px; opacity: 0.72; margin-top: -26px; margin-bottom: 36px; font-style: italic; max-width: 500px; line-height: 1.6;">A Graduation Project Submitted in Partial Fulfillment of the Requirements for the Bachelor of Computer Science Degree</p>
+
+  <div class="meta-grid">
+    <div class="meta-item">
+      <div class="label">Academic Year</div>
+      <div class="value">2025 / 2026</div>
+    </div>
+    <div class="meta-item">
+      <div class="label">Project Type</div>
+      <div class="value">Graduation Project</div>
+    </div>
+    <div class="meta-item">
+      <div class="label">Department</div>
+      <div class="value">Computer Science</div>
+    </div>
+    <div class="meta-item">
+      <div class="label">Document Date</div>
+      <div class="value">June 2026</div>
+    </div>
+  </div>
+
+  <div class="badges">
+    <span class="badge">React 19</span>
+    <span class="badge">Express 5</span>
+    <span class="badge">MongoDB / Mongoose</span>
+    <span class="badge">TailwindCSS 4</span>
+    <span class="badge">Groq SDK</span>
+    <span class="badge">Google Generative AI</span>
+    <span class="badge">JWT Auth</span>
+    <span class="badge">ExcelJS</span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     ABSTRACT
+══════════════════════════════════════════════════════════════════ -->
+<div class="toc-page" id="abstract">
+  <h2>Abstract</h2>
+  <p>
+    This report presents the design, architecture, and implementation of <strong>AI Accountant</strong>, an intelligent financial management system developed as a graduation project at Akhbar El-Youm Academy, Faculty of Computer Science, in partial fulfillment of the requirements for the Bachelor of Computer Science degree. The system addresses the financial management challenges commonly encountered by small and medium-sized enterprises (SMEs), where affordable, intelligent accounting tools with real-time analytical capabilities remain scarce.
+  </p>
+  <p>
+    The proposed system delivers a comprehensive suite of accounting functionalities, including real-time Key Performance Indicator (KPI) dashboards, automated transaction classification, AI-driven spreadsheet generation, natural-language financial querying via a conversational chatbot interface, and a versioned in-browser Excel editor. Two AI providers are leveraged: the Groq inference engine running the LLaMA 3.3-70B model for conversational and generative tasks, and Google Gemini for multi-modal document analysis and automated transaction extraction from uploaded financial files.
+  </p>
+  <p>
+    The system adopts a client-server architecture comprising a React 19 Single-Page Application (SPA) on the frontend and a Node.js/Express 5 RESTful API server on the backend, with data persisted in a MongoDB database via the Mongoose ODM. A tiered subscription model governs feature access, and a versioned public REST API enables programmatic integration by third-party developers. Security is enforced through stateless JWT authentication, bcrypt-hashed credentials, Helmet HTTP security headers, and scope-based API key authorization, all conforming to OWASP Top Ten security guidelines.
+  </p>
+  <p>
+    The implemented system demonstrates the technical viability of integrating generative AI within a traditional enterprise accounting workflow, substantially reducing manual data-entry overhead and enhancing financial visibility for business operators.
+  </p>
+  <p style="margin-top: 24px;"><strong>Keywords:</strong> Artificial Intelligence, Financial Management, Large Language Models, RESTful API, Single-Page Application, React, Node.js, MongoDB, Groq, LLaMA, Google Gemini, Generative AI, SME Accounting, Natural Language Processing, JWT Authentication.</p>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     TABLE OF CONTENTS
+══════════════════════════════════════════════════════════════════ -->
+<div class="toc-page">
+  <h2>Table of Contents</h2>
+
+  <div class="toc-section main"><a href="#abstract"><span>Abstract</span><span class="toc-dots"></span><span>3</span></a></div>
+
+  <div class="toc-section main"><a href="#overview"><span>1. Project Overview</span><span class="toc-dots"></span><span>4</span></a></div>
+  <div class="toc-section sub"><a href="#overview-goals"><span>1.1 Problem Statement &amp; Research Objectives</span><span class="toc-dots"></span><span>4</span></a></div>
+  <div class="toc-section sub"><a href="#overview-tech"><span>1.2 Technology Stack</span><span class="toc-dots"></span><span>4</span></a></div>
+  <div class="toc-section sub"><a href="#overview-background"><span>1.3 Background &amp; Related Work</span><span class="toc-dots"></span><span>5</span></a></div>
+
+  <div class="toc-section main"><a href="#architecture"><span>2. System Architecture</span><span class="toc-dots"></span><span>5</span></a></div>
+  <div class="toc-section sub"><a href="#arch-overview"><span>2.1 High-Level Architecture</span><span class="toc-dots"></span><span>5</span></a></div>
+  <div class="toc-section sub"><a href="#arch-structure"><span>2.2 Directory Structure</span><span class="toc-dots"></span><span>5</span></a></div>
+
+  <div class="toc-section main"><a href="#backend"><span>3. Backend</span><span class="toc-dots"></span><span>6</span></a></div>
+  <div class="toc-section sub"><a href="#backend-server"><span>3.1 Server Setup & Middleware</span><span class="toc-dots"></span><span>6</span></a></div>
+  <div class="toc-section sub"><a href="#backend-models"><span>3.2 Data Models</span><span class="toc-dots"></span><span>7</span></a></div>
+  <div class="toc-section sub"><a href="#backend-auth"><span>3.3 Authentication System</span><span class="toc-dots"></span><span>8</span></a></div>
+  <div class="toc-section sub"><a href="#backend-transactions"><span>3.4 Transactions Engine</span><span class="toc-dots"></span><span>9</span></a></div>
+  <div class="toc-section sub"><a href="#backend-dashboard"><span>3.5 Dashboard & KPI Analytics</span><span class="toc-dots"></span><span>9</span></a></div>
+  <div class="toc-section sub"><a href="#backend-ai"><span>3.6 AI Integrations</span><span class="toc-dots"></span><span>10</span></a></div>
+  <div class="toc-section sub"><a href="#backend-excel"><span>3.7 Excel Processing</span><span class="toc-dots"></span><span>11</span></a></div>
+  <div class="toc-section sub"><a href="#backend-admin"><span>3.8 Admin Panel</span><span class="toc-dots"></span><span>11</span></a></div>
+
+  <div class="toc-section main"><a href="#api"><span>4. REST API Reference</span><span class="toc-dots"></span><span>12</span></a></div>
+  <div class="toc-section sub"><a href="#api-auth"><span>4.1 Auth Endpoints</span><span class="toc-dots"></span><span>12</span></a></div>
+  <div class="toc-section sub"><a href="#api-transactions"><span>4.2 Transaction Endpoints</span><span class="toc-dots"></span><span>12</span></a></div>
+  <div class="toc-section sub"><a href="#api-dashboard"><span>4.3 Dashboard Endpoints</span><span class="toc-dots"></span><span>13</span></a></div>
+  <div class="toc-section sub"><a href="#api-ai"><span>4.4 AI Endpoints</span><span class="toc-dots"></span><span>13</span></a></div>
+  <div class="toc-section sub"><a href="#api-subscriptions"><span>4.5 Subscription Endpoints</span><span class="toc-dots"></span><span>14</span></a></div>
+  <div class="toc-section sub"><a href="#api-public"><span>4.6 Public v1 API (API Key Auth)</span><span class="toc-dots"></span><span>14</span></a></div>
+
+  <div class="toc-section main"><a href="#frontend"><span>5. Frontend</span><span class="toc-dots"></span><span>15</span></a></div>
+  <div class="toc-section sub"><a href="#frontend-structure"><span>5.1 Structure & Routing</span><span class="toc-dots"></span><span>15</span></a></div>
+  <div class="toc-section sub"><a href="#frontend-pages"><span>5.2 Pages & Components</span><span class="toc-dots"></span><span>15</span></a></div>
+  <div class="toc-section sub"><a href="#frontend-state"><span>5.3 State Management</span><span class="toc-dots"></span><span>16</span></a></div>
+
+  <div class="toc-section main"><a href="#subscription"><span>6. Subscription & Billing</span><span class="toc-dots"></span><span>17</span></a></div>
+  <div class="toc-section main"><a href="#security"><span>7. Security</span><span class="toc-dots"></span><span>18</span></a></div>
+  <div class="toc-section main"><a href="#devguide"><span>8. Developer Guide</span><span class="toc-dots"></span><span>19</span></a></div>
+  <div class="toc-section sub"><a href="#devguide-setup"><span>8.1 Local Setup</span><span class="toc-dots"></span><span>19</span></a></div>
+  <div class="toc-section sub"><a href="#devguide-env"><span>8.2 Environment Variables</span><span class="toc-dots"></span><span>19</span></a></div>
+  <div class="toc-section sub"><a href="#devguide-apikeys"><span>8.3 Developer API Keys</span><span class="toc-dots"></span><span>20</span></a></div>
+  <div class="toc-section main"><a href="#deployment"><span>9. Deployment</span><span class="toc-dots"></span><span>21</span></a></div>
+  <div class="toc-section main"><a href="#email"><span>10. Email Service</span><span class="toc-dots"></span><span>22</span></a></div>
+  <div class="toc-section main"><a href="#conclusion"><span>11. Conclusion &amp; Future Work</span><span class="toc-dots"></span><span>23</span></a></div>
+  <div class="toc-section sub"><a href="#conclusion"><span>11.1 Conclusion</span><span class="toc-dots"></span><span>23</span></a></div>
+  <div class="toc-section sub"><a href="#conclusion"><span>11.2 Limitations</span><span class="toc-dots"></span><span>24</span></a></div>
+  <div class="toc-section sub"><a href="#conclusion"><span>11.3 Future Work</span><span class="toc-dots"></span><span>24</span></a></div>
+  <div class="toc-section main"><a href="#references"><span>12. References &amp; Bibliography</span><span class="toc-dots"></span><span>25</span></a></div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════════
+     SECTION 1 – PROJECT OVERVIEW
+══════════════════════════════════════════════════════════════════ -->
+<div class="section" id="overview">
+  <div class="section-header">
+    <div class="section-icon icon-blue">🏦</div>
+    <h2>1. Project Overview</h2>
+  </div>
+
+  <p>
+    <strong>AI Accountant</strong> is a full-stack, intelligent financial management system developed to address the accounting and analytical requirements of small and medium-sized enterprises (SMEs). The system synthesizes conventional bookkeeping methodologies with state-of-the-art artificial intelligence capabilities, encompassing automated transaction classification, AI-driven spreadsheet generation, real-time financial Key Performance Indicator (KPI) dashboards, and a natural-language conversational financial advisory interface powered by large language models (LLMs).
+  </p>
+  <p>
+    This system was conceived and implemented as a graduation capstone project at Akhbar El-Youm Academy, Faculty of Computer Science, during the academic year 2025/2026. It demonstrates the practical application of modern full-stack web engineering principles, distributed system design patterns, and the integration of generative AI language models within a production-grade software architecture.
+  </p>
+
+  <h3 id="overview-goals">1.1 Problem Statement &amp; Research Objectives</h3>
+  <p>
+    Small and medium-sized enterprises frequently encounter significant challenges in managing financial operations efficiently. Traditional accounting software solutions are either prohibitively expensive, require dedicated accounting personnel, or lack the intelligence necessary to deliver actionable business insights in real time. The recent proliferation of large language models (LLMs) and generative AI presents a compelling opportunity to augment conventional accounting tools with natural-language interfaces, automated data extraction, and intelligent financial advisory capabilities.
+  </p>
+  <p>The following primary objectives guided the design and implementation of this system:</p>
+  <div class="card-grid card-grid-2">
+    <div class="card">
+      <div class="card-title">📊 Financial Visibility</div>
+      <p>Provide business owners with real-time KPI dashboards — revenue, expenses, profit margin, cash flow, burn rate, and tax estimates — with month-over-month trend comparisons.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">🤖 AI-Powered Analysis</div>
+      <p>Integrate Groq (LLaMA 3) and Google Gemini AI to enable natural-language financial queries, automatic transaction categorization, chart generation, and spreadsheet creation.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">📁 Smart Data Ingestion</div>
+      <p>Accept Excel (.xlsx, .xls) and PDF financial files, automatically extract and analyze transaction data using AI, and batch-import thousands of records via a background job queue.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">🔌 Developer API</div>
+      <p>Expose a versioned public REST API (v1) secured by API keys, allowing third-party integrations to read/write transactions and retrieve dashboard KPIs programmatically.</p>
+    </div>
+  </div>
+
+  <h3 id="overview-tech">1.2 Technology Stack</h3>
+  <table>
+    <thead>
+      <tr><th>Layer</th><th>Technology</th><th>Purpose</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><span class="badge-pill badge-blue">Frontend</span></td><td>React 19, Vite 7, TailwindCSS 4</td><td>SPA with fast HMR development</td></tr>
+      <tr><td><span class="badge-pill badge-blue">Frontend</span></td><td>React Router v7, Zustand, TanStack Query</td><td>Routing, global state, server-state caching</td></tr>
+      <tr><td><span class="badge-pill badge-blue">Frontend</span></td><td>Recharts, Flowbite React</td><td>Data visualization, UI component library</td></tr>
+      <tr><td><span class="badge-pill badge-green">Backend</span></td><td>Node.js, Express 5</td><td>REST API server</td></tr>
+      <tr><td><span class="badge-pill badge-green">Backend</span></td><td>Mongoose 8, MongoDB</td><td>Primary database (ODM)</td></tr>
+      <tr><td><span class="badge-pill badge-green">Backend</span></td><td>JWT (jsonwebtoken)</td><td>Stateless authentication</td></tr>
+      <tr><td><span class="badge-pill badge-green">Backend</span></td><td>Helmet, express-rate-limit</td><td>Security headers and rate limiting</td></tr>
+      <tr><td><span class="badge-pill badge-purple">AI</span></td><td>Groq SDK (LLaMA 3.3-70b)</td><td>Chatbot, chart generation, Excel generation</td></tr>
+      <tr><td><span class="badge-pill badge-purple">AI</span></td><td>Google Generative AI (Gemini)</td><td>Document parsing, AI analysis</td></tr>
+      <tr><td><span class="badge-pill badge-orange">Files</span></td><td>ExcelJS, Multer, pdf-parse</td><td>Excel/PDF file handling and parsing</td></tr>
+      <tr><td><span class="badge-pill badge-gray">Email</span></td><td>Nodemailer, Resend</td><td>Transactional emails (password reset)</td></tr>
+      <tr><td><span class="badge-pill badge-gray">Validation</span></td><td>Zod, express-validator</td><td>Input validation (FE + BE)</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="overview-background">1.3 Background &amp; Related Work</h3>
+  <p>
+    The application of artificial intelligence to financial management software has attracted considerable research and industrial interest in recent years. Established commercial platforms such as QuickBooks Online, Xero, and Wave Accounting offer robust bookkeeping functionality but provide limited AI-driven intelligence beyond rule-based automation heuristics. Academic research has investigated LLM-based document information extraction, natural-language interfaces for structured database querying, and supervised machine-learning models for transaction categorization — capabilities that this project unifies within a single cohesive system.
+  </p>
+  <p>
+    This project builds upon and synthesizes prior work in four principal areas: (i) <strong>RESTful API design</strong> adhering to Fielding's representational state transfer (REST) architectural constraints for stateless client-server communication; (ii) <strong>LLM integration</strong> leveraging the Groq inference API (LLaMA 3.3-70B) for text generation tasks and the Google Gemini API for multi-modal document understanding; (iii) <strong>modern Single-Page Application (SPA) architecture</strong> employing React 19 with optimistic server-state management via TanStack Query; and (iv) <strong>security-first backend design</strong> conforming to OWASP Top Ten security guidelines including input validation, rate limiting, and zero-knowledge credential storage.
+  </p>
+  <div class="info-box info">
+    <div class="icon">📖</div>
+    <div class="text">
+      <strong>Distinguishing Contribution</strong>
+      Unlike existing SME accounting platforms, this system integrates two complementary AI providers within a unified architecture: Groq's LLaMA 3.3-70B for conversational dialogue and generative spreadsheet creation, and Google Gemini for multi-modal financial document parsing. This combination enables end-to-end AI-assisted accounting workflows spanning document ingestion, automated transaction classification, interactive natural-language querying, and on-demand report generation.
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════════
+     SECTION 2 – ARCHITECTURE
+══════════════════════════════════════════════════════════════════ -->
+<div class="section" id="architecture">
+  <div class="section-header">
+    <div class="section-icon icon-purple">🏗️</div>
+    <h2>2. System Architecture</h2>
+  </div>
+
+  <h3 id="arch-overview">2.1 High-Level Architecture</h3>
+
+  <div style="max-width:500px; margin: 0 auto 24px;">
+    <div class="arch-box">🌐 Browser (React SPA – Vite)</div>
+    <div class="arch-arrow">⬇ HTTPS / REST (JSON)</div>
+    <div class="arch-box">⚙️ Express 5 API Server (Node.js)</div>
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin:10px 0;">
+      <div class="arch-arrow" style="text-align:center;">⬇️</div>
+      <div class="arch-arrow" style="text-align:center;">⬇️</div>
+      <div class="arch-arrow" style="text-align:center;">⬇️</div>
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
+      <div class="arch-box">🍃 MongoDB (Mongoose)</div>
+      <div class="arch-box">🤖 Groq AI / Gemini</div>
+      <div class="arch-box">📁 File Storage (Local)</div>
+    </div>
+  </div>
+
+  <div class="info-box info">
+    <div class="icon">💡</div>
+    <div class="text">
+      <strong>Dual Data-Store Pattern</strong>
+      The backend automatically falls back to a local file-based store (JSON files on disk) when MongoDB is unavailable or when the user ID is not a valid MongoDB ObjectId. This allows the app to function fully in development without a database connection.
+    </div>
+  </div>
+
+  <h3 id="arch-structure">2.2 Directory Structure</h3>
+  <div class="file-tree">
+<span class="dir">aiAccountant/</span><br>
+├── <span class="dir">backend/</span>           <span style="color:#64748b;">— Node.js / Express API server</span><br>
+│   ├── <span class="file-js">server.js</span>            <span style="color:#64748b;">— Entry point, route mounting</span><br>
+│   ├── <span class="dir">config/</span><br>
+│   │   └── <span class="file-js">constants.js</span>     <span style="color:#64748b;">— App-wide constants, subscription plans</span><br>
+│   ├── <span class="dir">controllers/</span>       <span style="color:#64748b;">— Request handlers (business logic)</span><br>
+│   ├── <span class="dir">middleware/</span>        <span style="color:#64748b;">— Auth, rate-limit, validation, checkLimit</span><br>
+│   ├── <span class="dir">models/</span>            <span style="color:#64748b;">— Mongoose schemas</span><br>
+│   ├── <span class="dir">routes/</span>            <span style="color:#64748b;">— Express route definitions</span><br>
+│   ├── <span class="dir">services/</span>          <span style="color:#64748b;">— Business services, local stores, email</span><br>
+│   ├── <span class="dir">validators/</span>        <span style="color:#64748b;">— Zod / express-validator schemas</span><br>
+│   └── <span class="dir">uploads/</span>           <span style="color:#64748b;">— File uploads + usage JSON store</span><br>
+├── <span class="dir">frontend/</span>          <span style="color:#64748b;">— React 19 / Vite SPA</span><br>
+│   └── <span class="dir">src/</span><br>
+│       ├── <span class="file-jsx">App.jsx</span>          <span style="color:#64748b;">— Root component & router</span><br>
+│       ├── <span class="dir">Component/</span>       <span style="color:#64748b;">— Auth forms, chatbot, excel tools</span><br>
+│       ├── <span class="dir">components/</span>      <span style="color:#64748b;">— Dashboard, Transactions, ExcelEditor</span><br>
+│       ├── <span class="dir">pages/</span>           <span style="color:#64748b;">— Landing, Pricing, Admin, Developer</span><br>
+│       ├── <span class="dir">Context/</span>         <span style="color:#64748b;">— Auth, Theme, Subscription contexts</span><br>
+│       ├── <span class="dir">stores/</span>          <span style="color:#64748b;">— Zustand stores</span><br>
+│       ├── <span class="dir">hooks/</span>           <span style="color:#64748b;">— Custom React hooks</span><br>
+│       ├── <span class="dir">services/</span>        <span style="color:#64748b;">— API call abstractions</span><br>
+│       └── <span class="dir">layouts/</span>         <span style="color:#64748b;">— Dashboard, Transactions layouts</span><br>
+└── <span class="dir">docs/</span>              <span style="color:#64748b;">— Architecture docs & wireframes</span>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════════
+     SECTION 3 – BACKEND
+══════════════════════════════════════════════════════════════════ -->
+<div class="section" id="backend">
+  <div class="section-header">
+    <div class="section-icon icon-green">⚙️</div>
+    <h2>3. Backend</h2>
+  </div>
+
+  <h3 id="backend-server">3.1 Server Setup &amp; Middleware</h3>
+  <p>The Express 5 server is the entry point at <code>backend/server.js</code>. It configures a layered middleware pipeline before mounting route modules.</p>
+
+  <table>
+    <thead><tr><th>Middleware</th><th>Purpose</th><th>Config</th></tr></thead>
+    <tbody>
+      <tr><td><code>helmet</code></td><td>Sets secure HTTP headers (CSP, HSTS, X-Frame-Options, etc.)</td><td>Default config</td></tr>
+      <tr><td><code>cors</code></td><td>Restricts origins; in production only allows <code>CLIENT_URL</code> env list</td><td>Credentials: true, All methods</td></tr>
+      <tr><td><code>express.json</code></td><td>Body parser for JSON payloads</td><td>25 MB limit</td></tr>
+      <tr><td>Request Logger</td><td>Logs request ID, method, route, status, latency, response bytes</td><td>Custom middleware with <code>hrtime</code></td></tr>
+      <tr><td><code>apiLimiter</code></td><td>Global rate limiter on all <code>/api/*</code> routes</td><td>2000 req / 15 min (prod only)</td></tr>
+      <tr><td><code>authLimiter</code></td><td>Stricter rate limiter on auth endpoints</td><td>10 attempts / 15 min (prod only)</td></tr>
+      <tr><td>Error Handler</td><td>Catches all unhandled errors, returns structured JSON</td><td>Hides stack traces in production</td></tr>
+    </tbody>
+  </table>
+
+  <h4>Health Endpoint</h4>
+  <p>The <code>GET /health</code> endpoint returns live database connectivity status, uptime, memory usage, and MongoDB/Redis health.</p>
+
+  <h3 id="backend-models">3.2 Data Models</h3>
+
+  <h4>User Model</h4>
+  <table>
+    <thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>name</td><td>String</td><td>Required</td></tr>
+      <tr><td>email</td><td>String</td><td>Required, unique</td></tr>
+      <tr><td>password</td><td>String</td><td>bcrypt hashed (10 rounds)</td></tr>
+      <tr><td>businessType</td><td>Enum</td><td><code>retail</code> | <code>wholesale</code> | <code>service</code></td></tr>
+      <tr><td>resetPasswordTokenHash</td><td>String</td><td>SHA-256 hash of reset token (never stored plaintext)</td></tr>
+      <tr><td>resetPasswordExpiresAt</td><td>Date</td><td>1-hour expiry</td></tr>
+      <tr><td>passwordChangedAt</td><td>Date</td><td>Set on password change</td></tr>
+      <tr><td>createdAt / updatedAt</td><td>Date</td><td>Auto-managed by Mongoose timestamps</td></tr>
+    </tbody>
+  </table>
+
+  <h4>Transaction Model</h4>
+  <table>
+    <thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>date</td><td>Date</td><td>Required</td></tr>
+      <tr><td>desc</td><td>String</td><td>Required — transaction description</td></tr>
+      <tr><td>amount</td><td>Number</td><td>Required — always stored as positive; type field determines direction</td></tr>
+      <tr><td>currency</td><td>String</td><td>Default: USD</td></tr>
+      <tr><td>category</td><td>String</td><td>Required</td></tr>
+      <tr><td>subcategory</td><td>String</td><td>Optional</td></tr>
+      <tr><td>type</td><td>Enum</td><td><code>income</code> | <code>expense</code> | <code>transfer</code></td></tr>
+      <tr><td>vendor</td><td>String</td><td>Payee name</td></tr>
+      <tr><td>paymentMethod</td><td>Enum</td><td>cash / credit_card / debit_card / bank_transfer / check / other</td></tr>
+      <tr><td>status</td><td>Enum</td><td>pending / approved / rejected / needs_review / reconciled / flagged</td></tr>
+      <tr><td>sourceFile</td><td>Object</td><td>Filename, original name, type (excel/pdf), upload date</td></tr>
+      <tr><td>aiAnalysis</td><td>Object</td><td>confidence score, extractedText, suggestedCategory, processingNotes</td></tr>
+      <tr><td>isReconciled</td><td>Boolean</td><td>Reconciliation flag</td></tr>
+    </tbody>
+  </table>
+
+  <h4>Subscription Model</h4>
+  <table>
+    <thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>user</td><td>ObjectId → User</td><td>One-to-one relationship</td></tr>
+      <tr><td>plan</td><td>Enum</td><td><code>free</code> | <code>pro</code> | <code>business</code></td></tr>
+      <tr><td>status</td><td>Enum</td><td>active / cancelled / past_due</td></tr>
+      <tr><td>billingCycle</td><td>Enum</td><td>monthly / annual</td></tr>
+      <tr><td>cancelAtPeriodEnd</td><td>Boolean</td><td>Graceful cancellation flag</td></tr>
+      <tr><td>paymentMethod</td><td>Object</td><td>Stores last4 / brand / expiry (no raw card numbers)</td></tr>
+      <tr><td>invoices</td><td>Array</td><td>Invoice history (amount, status, plan, billingCycle, paidAt)</td></tr>
+    </tbody>
+  </table>
+
+  <h4>ApiKey Model</h4>
+  <p>Developer API keys follow a zero-knowledge storage pattern:</p>
+  <ul>
+    <li>Wire format: <code>ak_&lt;32 random hex bytes&gt;</code> (68 chars total)</li>
+    <li>Only the <strong>SHA-256 hash</strong> of the key is stored in the database</li>
+    <li>The first 10 characters (<code>keyPrefix</code>) are stored as a safe display hint</li>
+    <li>Scopes control access: <code>transactions:read</code>, <code>transactions:write</code>, <code>dashboard:read</code>, <code>excel:read</code>, <code>excel:write</code>, <code>chatbot:read</code></li>
+  </ul>
+
+  <h3 id="backend-auth">3.3 Authentication System</h3>
+  <p>Authentication uses <strong>stateless JWT tokens</strong> with a 72-hour expiry. The system supports both MongoDB-backed and local file-based user storage.</p>
+
+  <h4>Registration Flow</h4>
+  <ol>
+    <li>Client POSTs <code>name</code>, <code>email</code>, <code>password</code>, <code>businessType</code></li>
+    <li>Input validated by express-validator rules</li>
+    <li>Password hashed with bcrypt (10 salt rounds)</li>
+    <li>User created in MongoDB or local JSON store (dev fallback)</li>
+    <li>JWT signed and returned to client</li>
+  </ol>
+
+  <h4>Login Flow</h4>
+  <ol>
+    <li>Client POSTs <code>email</code> + <code>password</code></li>
+    <li>User fetched from store; bcrypt compare performed</li>
+    <li>On success: JWT (72h) returned; client stores in memory / localStorage</li>
+    <li>All subsequent requests attach <code>Authorization: Bearer &lt;token&gt;</code></li>
+  </ol>
+
+  <h4>Password Reset Flow</h4>
+  <ol>
+    <li>User POSTs email to <code>/api/auth/forgot-password</code></li>
+    <li>Crypto random token generated; SHA-256 hash stored in DB with 1h expiry</li>
+    <li>Plain token sent via email link (Nodemailer / Resend)</li>
+    <li>User visits reset link → POSTs new password + token to <code>/api/auth/reset-password</code></li>
+    <li>Token hash verified; new password bcrypt-hashed and saved</li>
+  </ol>
+
+  <h4>Admin Detection</h4>
+  <p>Admin status is determined at token-sign time by checking the user's email against the <code>ADMIN_EMAILS</code> environment variable (comma-separated list). The <code>isAdmin</code> flag is embedded in the JWT payload.</p>
+
+  <h3 id="backend-transactions">3.4 Transactions Engine</h3>
+  <p>The transaction system supports CRUD operations, bulk operations, file uploads, and a streaming background import job queue.</p>
+
+  <h4>File Upload &amp; AI Analysis</h4>
+  <ol>
+    <li>Multer accepts Excel (.xlsx, .xls) and PDF files (max 10 MB)</li>
+    <li>ExcelJS parses Excel sheets; pdf-parse extracts PDF text</li>
+    <li>Google Gemini AI analyzes extracted content to auto-classify transactions (category, type, amount, date)</li>
+    <li>Results returned as structured JSON for user review before saving</li>
+  </ol>
+
+  <h4>Background Import Jobs</h4>
+  <p>Large imports use a streaming job queue to avoid HTTP timeouts:</p>
+  <ol>
+    <li><strong>Create Job</strong>: POST <code>/api/transactions/import-jobs</code> → returns <code>jobId</code></li>
+    <li><strong>Stream Status</strong>: GET <code>/api/transactions/import-jobs/:id/stream</code> (SSE)</li>
+    <li><strong>Add Chunks</strong>: POST <code>/api/transactions/import-jobs/:id/chunks</code></li>
+    <li><strong>Finalize</strong>: POST <code>/api/transactions/import-jobs/:id/finalize</code></li>
+    <li><strong>Retry / Cancel</strong>: POST <code>.../retry</code> or <code>.../cancel</code></li>
+  </ol>
+
+  <h3 id="backend-dashboard">3.5 Dashboard &amp; KPI Analytics</h3>
+  <p>The <code>calculateDashboard</code> function computes financial KPIs from raw transaction arrays without aggregation queries, making it compatible with both the MongoDB store and local JSON store.</p>
+
+  <table>
+    <thead><tr><th>KPI</th><th>Calculation</th></tr></thead>
+    <tbody>
+      <tr><td>Total Revenue</td><td>Sum of all <code>income</code> transactions</td></tr>
+      <tr><td>Total Expenses</td><td>Sum of all <code>expense</code> transactions</td></tr>
+      <tr><td>Net Profit</td><td>Revenue − Expenses</td></tr>
+      <tr><td>Profit Margin</td><td>(Net Profit / Revenue) × 100%</td></tr>
+      <tr><td>Revenue Growth</td><td>(Current Month Revenue − Previous Month Revenue) / Previous Month Revenue × 100%</td></tr>
+      <tr><td>Burn Rate</td><td>Current month expenses (or average monthly expenses)</td></tr>
+      <tr><td>Runway</td><td>Net Profit / Burn Rate (months)</td></tr>
+      <tr><td>Tax Estimate</td><td>Current month profit × 22%</td></tr>
+      <tr><td>Pending Count</td><td>Count of transactions with <code>pending</code> or <code>needs_review</code> status</td></tr>
+      <tr><td>Monthly Breakdown</td><td>Revenue, expenses, profit, cash flow per calendar month</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="backend-ai">3.6 AI Integrations</h3>
+  <p>The platform uses two AI providers through separate controllers:</p>
+
+  <div class="card-grid card-grid-2">
+    <div class="card">
+      <div class="card-title">🤖 Groq (LLaMA 3)</div>
+      <p><strong>Model:</strong> llama-3.3-70b-versatile<br>
+      <strong>Used for:</strong></p>
+      <ul>
+        <li>AI Chatbot — natural language financial Q&amp;A</li>
+        <li>AI Chart Generator — generates chart configs from text prompts</li>
+        <li>AI Excel Generator — creates full Excel spreadsheets from text descriptions</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-title">✨ Google Gemini</div>
+      <p><strong>Model:</strong> gemini-pro / gemini-flash<br>
+      <strong>Used for:</strong></p>
+      <ul>
+        <li>Document parsing (PDF / Excel transaction extraction)</li>
+        <li>AI financial analysis and categorization</li>
+        <li>Supplementary chart and insight generation</li>
+      </ul>
+    </div>
+  </div>
+
+  <h4>AI Chatbot Architecture</h4>
+  <p>The chatbot controller queries the user's transactions (both MongoDB and local store compatible) and builds a structured context for the AI. It supports:</p>
+  <ul>
+    <li>Grouping transactions by <code>category</code>, <code>month</code>, or <code>type</code></li>
+    <li>Sorting by <code>amount</code>, <code>date</code>, or <code>count</code></li>
+    <li>Date range filtering</li>
+    <li>Multi-turn conversation history via MongoDB <code>Chat</code> model</li>
+    <li>Usage tracking (per-user monthly AI chat message count)</li>
+  </ul>
+
+  <h4>AI Excel Generator</h4>
+  <p>Accepts a natural-language description and uses Groq to produce a custom delimited text format that is then parsed and rendered into a real Excel file using ExcelJS. Supports:</p>
+  <ul>
+    <li>Custom column widths and row heights</li>
+    <li>Cell fill colors and font formatting (bold, size, color)</li>
+    <li>Formula cells</li>
+    <li>Merged cell ranges</li>
+    <li>Multiple named sheets</li>
+  </ul>
+
+  <h3 id="backend-excel">3.7 Excel Processing</h3>
+  <p>The Excel Editor module (<code>excelEditorController</code>) allows users to upload, view, and edit Excel files in-browser with version history:</p>
+  <ul>
+    <li>Files stored in <code>uploads/excel/</code> with user-scoped access</li>
+    <li>ExcelJS used for reading/writing .xlsx files</li>
+    <li>FileVersion model tracks change history</li>
+    <li>Reconciler service cross-references bank statements with transactions</li>
+  </ul>
+
+  <h3 id="backend-admin">3.8 Admin Panel</h3>
+  <p>The admin controller provides platform-level management accessible only to users whose email is listed in <code>ADMIN_EMAILS</code>:</p>
+  <div class="card-grid card-grid-2">
+    <div class="card">
+      <div class="card-title">📊 Platform Stats</div>
+      <p>Total user count, plan distribution (free/pro/business), new signups (last 7 days), monthly revenue estimate, blog post counts</p>
+    </div>
+    <div class="card">
+      <div class="card-title">👥 User Management</div>
+      <p>List all users, view subscription status, manage account states. Admin emails are excluded from user-facing stats.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">📝 CMS</div>
+      <p>Blog post CRUD (title, content, category, status), landing page content, navigation links, and pricing tier management</p>
+    </div>
+    <div class="card">
+      <div class="card-title">💰 Tier Management</div>
+      <p>Dynamically update subscription plan names, prices, features, and usage limits without code changes</p>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════════
+     SECTION 4 – REST API REFERENCE
+══════════════════════════════════════════════════════════════════ -->
+<div class="section" id="api">
+  <div class="section-header">
+    <div class="section-icon icon-orange">📡</div>
+    <h2>4. REST API Reference</h2>
+  </div>
+
+  <div class="info-box info">
+    <div class="icon">🔐</div>
+    <div class="text">
+      <strong>Authentication</strong>
+      All protected endpoints require the header <code>Authorization: Bearer &lt;JWT_TOKEN&gt;</code>.
+      The Public v1 API uses <code>X-API-Key: &lt;API_KEY&gt;</code> header instead.
+    </div>
+  </div>
+
+  <h3 id="api-auth">4.1 Auth Endpoints &nbsp;<span class="badge-pill badge-gray">Base: /api/auth</span></h3>
+  <div class="endpoint-row"><span class="method method-post">POST</span><span class="endpoint-path">/register</span><span class="endpoint-desc">Register a new user. Body: <code>name</code>, <code>email</code>, <code>password</code>, <code>businessType</code>. Returns JWT + user object.</span></div>
+  <div class="endpoint-row"><span class="method method-post">POST</span><span class="endpoint-path">/login</span><span class="endpoint-desc">Authenticate. Body: <code>email</code>, <code>password</code>. Returns JWT + user object.</span></div>
+  <div class="endpoint-row"><span class="method method-post">POST</span><span class="endpoint-path">/forgot-password</span><span class="endpoint-desc">Trigger password reset email. Body: <code>email</code>. Rate limited (10/15 min).</span></div>
+  <div class="endpoint-row"><span class="method method-post">POST</span><span class="endpoint-path">/reset-password</span><span class="endpoint-desc">Reset password using token. Body: <code>token</code>, <code>password</code>. Token expires in 1 hour.</span></div>
+
+  <h3 id="api-transactions">4.2 Transaction Endpoints &nbsp;<span class="badge-pill badge-gray">Base: /api/transactions</span></h3>
+  <div class="endpoint-row"><span class="method method-post">POST</span><span class="endpoint-path">/upload</span><span class="endpoint-desc">Upload Excel or PDF file for AI analysis. Multipart form-data with <code>file</code> field. Returns analyzed transaction array.</span></div>
+  <div class="endpoint-row"><span class="method method-post">POST</span><span class="endpoint-path">/import-jobs</span><span class="endpoint-desc">Create a background import job. Returns <code>jobId</code>.</span></div>
+  <div class="endpoint-row"><span class="method method-get">GET</span><span class="endpoint-path">/import-jobs/:jobId</span><span class="endpoint-desc">Get import job status and progress.</span></div>
+  <div class="endpoint-row"><span class="method method-get">GET</span><span class="endpoint-path">/import-jobs/:jobId/stream</span><span class="endpoint-desc">Server-Sent Events stream for real-time import progress.</span></div>
+  <div class="endpoint-row"><span class="method method-post">POST</span><span class="endpoint-path">/import-jobs/:jobId/chunks</span><span class="endpoint-desc">Add a batch of transactions to an import job.</span></div>
+  <div class="endpoint-row"><span class="method method-post">POST</span><span class="endpoint-path">/import-jobs/:jobId/finalize</span><span class="endpoint-desc">Commit the import job and save all transactions.</span></div>
+  <div class="endpoint-row"><span class="method method-post">POST</span><span class="endpoint-path">/import-jobs/:jobId/retry</span><span class="endpoint-desc">Retry failed chunks in an import job.</span></div>
+  <div class="endpoint-row"><span class="method method-post">POST</span><span class="endpoint-path">/import-jobs/:jobId/cancel</span><span class="endpoint-desc">Cancel a pending import job.</span></div>
+  <div class="endpoint-row"><span class="method method-post">POST</span><span class="endpoint-path">/</span><span class="endpoint-desc">Create a single manual transaction. Limit-checked against subscription plan.</span></div>
+  <div class="endpoint-row"><span class="method method-get">GET</span><span class="endpoint-path">/</span><span class="endpoint-desc">List transactions. Query params: <code>limit</code>, <code>page</code>, <code>cursor</code>, <code>category</code>, <code>status</code>, <code>type</code>, <code>search</code>, <code>dateFrom</code>, <code>dateTo</code>, <code>sort</code>, <code>direction</code>.</span></div>
+  <div class="endpoint-row"><span class="method method-get">GET</span><span class="endpoint-path">/stats</span><span class="endpoint-desc">Aggregated transaction statistics for the authenticated user.</span></div>
+  <div class="endpoint-row"><span class="method method-put">PUT</span><span class="endpoint-path">/:id</span><span class="endpoint-desc">Update a transaction by ID.</span></div>
+  <div class="endpoint-row"><span class="method method-delete">DELETE</span><span class="endpoint-path">/:id</span><span class="endpoint-desc">Delete a single transaction.</span></div>
+  <div class="endpoint-row"><span class="method method-delete">DELETE</span><span class="endpoint-path">/bulk</span><span class="endpoint-desc">Bulk delete transactions. Body: <code>ids</code> array.</span></div>
+  <div class="endpoint-row"><span class="method method-delete">DELETE</span><span class="endpoint-path">/all</span><span class="endpoint-desc">Delete all transactions for the authenticated user.</span></div>
+
+  <h3 id="api-dashboard">4.3 Dashboard Endpoints &nbsp;<span class="badge-pill badge-gray">Base: /api/dashboard</span></h3>
+  <div class="endpoint-row"><span class="method method-get">GET</span><span class="endpoint-path">/</span><span class="endpoint-desc">Full dashboard KPIs: revenue, expenses, profit, margin, growth, burn rate, runway, tax estimate, monthly breakdown, top categories.</span></div>
+
+  <h3 id="api-ai">4.4 AI Endpoints</h3>
+  <p><span class="badge-pill badge-gray">Chatbot: /api/chatbot</span></p>
+  <div class="endpoint-row"><span class="method method-post">POST</span><span class="endpoint-path">/chat</span><span class="endpoint-desc">Send a message to the AI financial assistant. Body: <code>message</code>, optional <code>sessionId</code>. Returns AI text response + usage stats.</span></div>
+  <div class="endpoint-row"><span class="method method-get">GET</span><span class="endpoint-path">/history</span><span class="endpoint-desc">Retrieve chat history for the current user.</span></div>
+  <div class="endpoint-row"><span class="method method-delete">DELETE</span><span class="endpoint-path">/history</span><span class="endpoint-desc">Clear chat history.</span></div>
+
+  <p><span class="badge-pill badge-gray">AI Charts: /api/ai-charts</span></p>
+  <div class="endpoint-row"><span class="method method-post">POST</span><span class="endpoint-path">/generate</span><span class="endpoint-desc">Generate a chart from natural language prompt. Uses Groq to produce chart config + data. Limit-checked.</span></div>
+
+  <p><span class="badge-pill badge-gray">AI Excel: /api/ai-excel</span></p>
+  <div class="endpoint-row"><span class="method method-post">POST</span><span class="endpoint-path">/generate</span><span class="endpoint-desc">Generate and download an Excel file from a text description. Returns binary .xlsx file stream.</span></div>
+
+  <p><span class="badge-pill badge-gray">Gemini: /api/gemini</span></p>
+  <div class="endpoint-row"><span class="method method-post">POST</span><span class="endpoint-path">/analyze</span><span class="endpoint-desc">Analyze uploaded document using Google Gemini AI.</span></div>
+
+  <h3 id="api-subscriptions">4.5 Subscription Endpoints &nbsp;<span class="badge-pill badge-gray">Base: /api/subscriptions</span></h3>
+  <div class="endpoint-row"><span class="method method-get">GET</span><span class="endpoint-path">/plans</span><span class="endpoint-desc">List all available subscription plans with features and pricing. Public (no auth required).</span></div>
+  <div class="endpoint-row"><span class="method method-get">GET</span><span class="endpoint-path">/current</span><span class="endpoint-desc">Get the current user's subscription, plan details, and usage stats.</span></div>
+  <div class="endpoint-row"><span class="method method-post">POST</span><span class="endpoint-path">/checkout</span><span class="endpoint-desc">Subscribe to a plan. Body: <code>plan</code>, <code>billingCycle</code>, <code>cardNumber</code>, <code>expiryMonth</code>, <code>expiryYear</code>, <code>cvv</code>, <code>cardholderName</code>.</span></div>
+  <div class="endpoint-row"><span class="method method-post">POST</span><span class="endpoint-path">/cancel</span><span class="endpoint-desc">Cancel subscription (cancels at period end).</span></div>
+  <div class="endpoint-row"><span class="method method-post">POST</span><span class="endpoint-path">/reactivate</span><span class="endpoint-desc">Reactivate a subscription set to cancel at period end.</span></div>
+
+  <h3 id="api-public">4.6 Public v1 API &nbsp;<span class="badge-pill badge-purple">API Key Auth — Base: /api/v1</span></h3>
+
+  <div class="info-box warn">
+    <div class="icon">🔑</div>
+    <div class="text">
+      <strong>Authentication</strong>
+      All v1 API endpoints (except <code>/ping</code>) require the header <code>X-API-Key: &lt;your_api_key&gt;</code>. Each endpoint also requires the key to have the appropriate scope.
+    </div>
+  </div>
+
+  <table>
+    <thead><tr><th>Method</th><th>Endpoint</th><th>Scope Required</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><span class="method method-get">GET</span></td><td><code>/ping</code></td><td>None</td><td>Health check — no auth</td></tr>
+      <tr><td><span class="method method-get">GET</span></td><td><code>/transactions</code></td><td>transactions:read</td><td>List transactions (paginated)</td></tr>
+      <tr><td><span class="method method-get">GET</span></td><td><code>/transactions/:id</code></td><td>transactions:read</td><td>Get single transaction</td></tr>
+      <tr><td><span class="method method-post">POST</span></td><td><code>/transactions</code></td><td>transactions:write</td><td>Create transaction</td></tr>
+      <tr><td><span class="method method-put">PUT</span></td><td><code>/transactions/:id</code></td><td>transactions:write</td><td>Update transaction</td></tr>
+      <tr><td><span class="method method-delete">DELETE</span></td><td><code>/transactions/:id</code></td><td>transactions:write</td><td>Delete transaction</td></tr>
+      <tr><td><span class="method method-get">GET</span></td><td><code>/dashboard</code></td><td>dashboard:read</td><td>KPI summary</td></tr>
+    </tbody>
+  </table>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════════
+     SECTION 5 – FRONTEND
+══════════════════════════════════════════════════════════════════ -->
+<div class="section" id="frontend">
+  <div class="section-header">
+    <div class="section-icon icon-blue">🖥️</div>
+    <h2>5. Frontend</h2>
+  </div>
+
+  <h3 id="frontend-structure">5.1 Structure &amp; Routing</h3>
+  <p>The frontend is a React 19 SPA built with Vite 7. React Router v7 handles client-side routing. All authenticated routes are wrapped in <code>&lt;ProtectedRoute&gt;</code>.</p>
+
+  <table>
+    <thead><tr><th>Route Pattern</th><th>Component</th><th>Access</th></tr></thead>
+    <tbody>
+      <tr><td><code>/</code></td><td>LandingPage</td><td>Public</td></tr>
+      <tr><td><code>/pricing</code></td><td>PricingPage</td><td>Public</td></tr>
+      <tr><td><code>/login</code></td><td>Login</td><td>Public (redirect if authed)</td></tr>
+      <tr><td><code>/register</code></td><td>Register</td><td>Public (redirect if authed)</td></tr>
+      <tr><td><code>/forgot-password</code></td><td>ForgotPassword</td><td>Public</td></tr>
+      <tr><td><code>/reset-password/:token</code></td><td>ResetPassword</td><td>Public</td></tr>
+      <tr><td><code>/app/:userId/dashboard</code></td><td>DashboardLayout</td><td>Protected</td></tr>
+      <tr><td><code>/app/:userId/transactions</code></td><td>TransactionsPage (lazy)</td><td>Protected</td></tr>
+      <tr><td><code>/app/:userId/ai-charts</code></td><td>AIChartsPage (lazy)</td><td>Protected</td></tr>
+      <tr><td><code>/app/:userId/excel</code></td><td>ExcelGenerator</td><td>Protected</td></tr>
+      <tr><td><code>/app/:userId/ai-excel</code></td><td>AIExcelGenerator</td><td>Protected</td></tr>
+      <tr><td><code>/app/:userId/chatbot</code></td><td>Chatbot</td><td>Protected</td></tr>
+      <tr><td><code>/app/:userId/excel-editor</code></td><td>ExcelUploadPage</td><td>Protected</td></tr>
+      <tr><td><code>/app/:userId/excel-editor/:fileId</code></td><td>ExcelEditorPage</td><td>Protected</td></tr>
+      <tr><td><code>/app/:userId/subscription</code></td><td>SubscriptionPage</td><td>Protected</td></tr>
+      <tr><td><code>/app/:userId/checkout</code></td><td>CheckoutPage</td><td>Protected</td></tr>
+      <tr><td><code>/app/:userId/developer</code></td><td>DeveloperSettingsPage (lazy)</td><td>Protected</td></tr>
+      <tr><td><code>/admin/*</code></td><td>AdminApp (lazy)</td><td>Admin only</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="frontend-pages">5.2 Pages &amp; Components</h3>
+
+  <div class="card-grid card-grid-2">
+    <div class="card">
+      <div class="card-title">📊 Dashboard</div>
+      <p>KPI summary cards (revenue, expenses, profit, margin, growth), monthly revenue/expense bar charts, category breakdown pie chart, recent transactions list, and pending alerts panel. Uses Recharts for data visualization.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">💳 Transactions</div>
+      <p>Full-featured transaction table with search, filter (type / category / status / date range), column sorting, inline editing, bulk select &amp; delete, CSV export, and file upload with AI import wizard.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">📈 AI Charts</div>
+      <p>Natural language chart generator. User types a prompt (e.g., "Show my expenses by category for Q1") and Groq AI generates an interactive Recharts visualization with a table view.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">🤖 AI Chatbot</div>
+      <p>Conversational financial assistant powered by Groq. Full chat history, markdown response rendering, usage meter showing remaining monthly AI messages.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">📁 Excel Tools</div>
+      <p><strong>Excel Editor:</strong> Upload, view, and edit Excel files in-browser. <strong>AI Excel Generator:</strong> Describe a spreadsheet in plain text and download the generated .xlsx file instantly.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">🏠 Landing Page</div>
+      <p>Marketing landing page with feature showcase, testimonials, pricing preview, and CTA buttons. Content managed via Admin CMS.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">💰 Subscription</div>
+      <p>Current plan overview, usage meters (transactions, uploads, AI features), invoice history, plan upgrade/downgrade, and cancellation flow.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">🔌 Developer Settings</div>
+      <p>API key management: create named keys with specific scopes, view key prefix hints, revoke keys, and view usage documentation and code examples.</p>
+    </div>
+  </div>
+
+  <h4>Admin Panel (AdminApp)</h4>
+  <p>Accessible at <code>/admin</code> for admin users only. Includes:</p>
+  <ul>
+    <li>Platform stats dashboard (users, revenue, signups)</li>
+    <li>User management table</li>
+    <li>Blog post CMS editor</li>
+    <li>Landing page content editor</li>
+    <li>Subscription tier &amp; pricing manager</li>
+    <li>Navigation link editor</li>
+  </ul>
+
+  <h3 id="frontend-state">5.3 State Management</h3>
+
+  <table>
+    <thead><tr><th>Layer</th><th>Tool</th><th>Responsibility</th></tr></thead>
+    <tbody>
+      <tr><td>Authentication</td><td>React Context (<code>AuthContext</code>)</td><td>JWT token, userId, login/logout, persisted in localStorage</td></tr>
+      <tr><td>Theme</td><td>React Context (<code>ThemeContext</code>)</td><td>Dark / light mode toggle, persisted preference</td></tr>
+      <tr><td>Subscription</td><td>React Context (<code>SubscriptionContext</code>)</td><td>Current plan, usage counters, feature gate checks</td></tr>
+      <tr><td>Server State</td><td>TanStack Query v5</td><td>API data fetching, caching, background refetching, optimistic updates</td></tr>
+      <tr><td>UI / Local State</td><td>Zustand stores</td><td>UI preferences, filter state, editor state</td></tr>
+      <tr><td>Form State</td><td>React Hook Form + Zod</td><td>Form validation and submission handling</td></tr>
+    </tbody>
+  </table>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════════
+     SECTION 6 – SUBSCRIPTION & BILLING
+══════════════════════════════════════════════════════════════════ -->
+<div class="section" id="subscription">
+  <div class="section-header">
+    <div class="section-icon icon-orange">💳</div>
+    <h2>6. Subscription &amp; Billing</h2>
+  </div>
+
+  <p>The platform uses a tiered subscription model with simulated payment processing (no live payment gateway). Plans are dynamically configurable via the Admin tier manager.</p>
+
+  <div class="plan-grid">
+    <div class="plan-card plan-free">
+      <div class="plan-name">Free</div>
+      <div class="plan-price">$0 <span>/ month</span></div>
+      <ul>
+        <li>50 transactions / month</li>
+        <li>2 Excel file uploads</li>
+        <li>10 AI chart generations</li>
+        <li>20 AI chat messages</li>
+        <li>5 AI Excel generations</li>
+        <li>Basic dashboard</li>
+        <li>Email support</li>
+      </ul>
+    </div>
+    <div class="plan-card plan-pro">
+      <div class="plan-name">Pro</div>
+      <div class="plan-price">$19 <span>/ month</span></div>
+      <ul>
+        <li>500 transactions / month</li>
+        <li>20 Excel file uploads</li>
+        <li>100 AI chart generations</li>
+        <li>500 AI chat messages</li>
+        <li>50 AI Excel generations</li>
+        <li>Advanced dashboard</li>
+        <li>Priority email support</li>
+        <li>Export to PDF</li>
+        <li>Team collaboration (up to 3)</li>
+      </ul>
+    </div>
+    <div class="plan-card plan-business">
+      <div class="plan-name">Business</div>
+      <div class="plan-price">$49 <span>/ month</span></div>
+      <ul>
+        <li>Unlimited transactions</li>
+        <li>Unlimited Excel uploads</li>
+        <li>Unlimited AI chart generations</li>
+        <li>Unlimited AI chat messages</li>
+        <li>Unlimited AI Excel generations</li>
+        <li>Full dashboard + reporting</li>
+        <li>Dedicated support</li>
+        <li>Custom integrations</li>
+        <li>Team collaboration (up to 10)</li>
+      </ul>
+    </div>
+  </div>
+
+  <h4>Annual Billing</h4>
+  <p>Annual billing is available at <strong>$190/year</strong> (Pro) and <strong>$490/year</strong> (Business), equivalent to approximately 2 months free.</p>
+
+  <h4>Usage Tracking</h4>
+  <p>Usage is tracked per-user per-calendar-month via a JSON file store at <code>uploads/usage/store.json</code>. The <code>checkLimit</code> middleware enforces limits before creating new resources. Features tracked:</p>
+  <ul>
+    <li><code>transactions</code> — manual transaction creations</li>
+    <li><code>excelUploads</code> — file upload operations</li>
+    <li><code>aiChartGenerations</code> — AI chart generate calls</li>
+    <li><code>aiChatMessages</code> — chatbot messages sent</li>
+    <li><code>aiExcelGenerations</code> — AI Excel generate calls</li>
+  </ul>
+
+  <h4>Test Payment Cards</h4>
+  <div class="info-box warn">
+    <div class="icon">⚠️</div>
+    <div class="text">
+      <strong>Simulated Payment Only</strong>
+      No real payment gateway is connected. The checkout flow validates card format and uses predefined test card numbers to simulate success, decline, insufficient funds, and expiry scenarios. This is for demonstration purposes only.
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════════
+     SECTION 7 – SECURITY
+══════════════════════════════════════════════════════════════════ -->
+<div class="section" id="security">
+  <div class="section-header">
+    <div class="section-icon icon-red">🔒</div>
+    <h2>7. Security</h2>
+  </div>
+
+  <div class="card-grid card-grid-2">
+    <div class="card">
+      <div class="card-title">🔐 Authentication</div>
+      <ul>
+        <li>Stateless JWT tokens (72h expiry)</li>
+        <li>bcrypt password hashing (10 salt rounds)</li>
+        <li>Auth rate limiter: 10 attempts / 15 min in production</li>
+        <li>Password reset tokens stored as SHA-256 hashes only</li>
+        <li>Reset tokens expire after 1 hour</li>
+        <li>isAdmin flag embedded in JWT at sign time</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-title">🛡️ HTTP Security</div>
+      <ul>
+        <li>Helmet sets: CSP, HSTS, X-Frame-Options, X-Content-Type-Options</li>
+        <li>CORS: production restricts to explicit origin whitelist</li>
+        <li>Global rate limiter: 2000 req / 15 min per IP</li>
+        <li>Trust proxy enabled for correct IP with Nginx / Render</li>
+        <li>Request body size limit: 25 MB</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-title">🔑 API Keys</div>
+      <ul>
+        <li>Zero-knowledge storage: only SHA-256(key) stored</li>
+        <li>Constant-time comparison to prevent timing attacks</li>
+        <li>Scope-based access control on every v1 endpoint</li>
+        <li>Keys can be revoked (isActive = false)</li>
+        <li>Optional expiry dates</li>
+        <li>Last-used timestamp tracking</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-title">✅ Input Validation</div>
+      <ul>
+        <li>All auth endpoints use express-validator rules</li>
+        <li>Transaction query params validated with Zod schema</li>
+        <li>File uploads restricted to .xlsx, .xls, .pdf (type + extension)</li>
+        <li>Max file size enforced at Multer level (10 MB)</li>
+        <li>Mongoose schemas provide secondary type enforcement</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-title">🚦 Error Handling</div>
+      <ul>
+        <li>Centralized error middleware — no raw errors leak to client</li>
+        <li>Stack traces hidden in production</li>
+        <li>Request IDs for tracing errors across logs</li>
+        <li>Unhandled promise rejections caught globally</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-title">🗄️ Data Security</div>
+      <ul>
+        <li>Card numbers are never stored — only brand, last4, expiry</li>
+        <li>Admin emails never appear in user-facing lists</li>
+        <li>File access is scoped by authenticated user ID</li>
+        <li>MongoDB connection with Mongoose strict schema enforcement</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════════
+     SECTION 8 – DEVELOPER GUIDE
+══════════════════════════════════════════════════════════════════ -->
+<div class="section" id="devguide">
+  <div class="section-header">
+    <div class="section-icon icon-green">🛠️</div>
+    <h2>8. Developer Guide</h2>
+  </div>
+
+  <h3 id="devguide-setup">8.1 Local Setup</h3>
+
+  <h4>Prerequisites</h4>
+  <ul>
+    <li>Node.js 20+ and npm 10+</li>
+    <li>MongoDB (local or Atlas URI)</li>
+    <li>Groq API key (free at <em>console.groq.com</em>)</li>
+    <li>Google Generative AI API key (optional — for Gemini features)</li>
+    <li>Resend or SMTP credentials (optional — for email features)</li>
+  </ul>
+
+  <h4>Installation</h4>
+  <pre><span class="cm"># 1. Clone and install root dependencies</span>
+npm install
+
+<span class="cm"># 2. Install backend dependencies</span>
+<span class="kw">cd</span> backend
+npm install
+
+<span class="cm"># 3. Install frontend dependencies</span>
+<span class="kw">cd</span> ../frontend
+npm install
+
+<span class="cm"># 4. Create backend environment file</span>
+<span class="kw">cp</span> backend/.env.example backend/.env
+<span class="cm"># Edit .env with your values</span>
+
+<span class="cm"># 5. Start backend server (port 5000)</span>
+<span class="kw">cd</span> backend
+node server.js
+
+<span class="cm"># 6. Start frontend dev server (port 5173)</span>
+<span class="kw">cd</span> ../frontend
+npm run dev</pre>
+
+  <div class="info-box success">
+    <div class="icon">✅</div>
+    <div class="text">
+      <strong>MongoDB is Optional in Development</strong>
+      The app automatically detects when MongoDB is unavailable and switches to a local file-based data store. All features work without a database during local development.
+    </div>
+  </div>
+
+  <h3 id="devguide-env">8.2 Environment Variables</h3>
+  <p>Create a <code>.env</code> file in the <code>backend/</code> directory:</p>
+
+  <table>
+    <thead><tr><th>Variable</th><th>Required</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>PORT</code></td><td><span class="badge-pill badge-gray">Optional</span></td><td>Server port (default: 5000)</td></tr>
+      <tr><td><code>NODE_ENV</code></td><td><span class="badge-pill badge-gray">Optional</span></td><td>Set to <code>production</code> to enable rate limiting, hide stack traces</td></tr>
+      <tr><td><code>JWT_SECRET</code></td><td><span class="badge-pill badge-red">Required</span></td><td>Long random string for JWT signing. Use dev fallback in development.</td></tr>
+      <tr><td><code>MONGODB_URI</code></td><td><span class="badge-pill badge-orange">Optional*</span></td><td>MongoDB connection string. App uses local store if absent.</td></tr>
+      <tr><td><code>CLIENT_URL</code></td><td><span class="badge-pill badge-orange">Optional*</span></td><td>Comma-separated allowed CORS origins (production)</td></tr>
+      <tr><td><code>GROQ_API_KEY</code></td><td><span class="badge-pill badge-orange">Optional*</span></td><td>Groq API key. Required for chatbot, AI charts, AI Excel features.</td></tr>
+      <tr><td><code>GEMINI_API_KEY</code></td><td><span class="badge-pill badge-orange">Optional*</span></td><td>Google Gemini API key. Required for document AI analysis.</td></tr>
+      <tr><td><code>ADMIN_EMAILS</code></td><td><span class="badge-pill badge-gray">Optional</span></td><td>Comma-separated admin email addresses</td></tr>
+      <tr><td><code>EMAIL_FROM</code></td><td><span class="badge-pill badge-gray">Optional</span></td><td>Sender address for transactional emails</td></tr>
+      <tr><td><code>RESEND_API_KEY</code></td><td><span class="badge-pill badge-gray">Optional</span></td><td>Resend API key (preferred email provider)</td></tr>
+      <tr><td><code>SMTP_HOST</code></td><td><span class="badge-pill badge-gray">Optional</span></td><td>SMTP host for Nodemailer fallback</td></tr>
+      <tr><td><code>SMTP_PORT</code></td><td><span class="badge-pill badge-gray">Optional</span></td><td>SMTP port (typically 587 or 465)</td></tr>
+      <tr><td><code>SMTP_USER</code></td><td><span class="badge-pill badge-gray">Optional</span></td><td>SMTP username</td></tr>
+      <tr><td><code>SMTP_PASS</code></td><td><span class="badge-pill badge-gray">Optional</span></td><td>SMTP password</td></tr>
+      <tr><td><code>MAX_FILE_SIZE</code></td><td><span class="badge-pill badge-gray">Optional</span></td><td>Max upload size in bytes (default: 10 MB)</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="devguide-apikeys">8.3 Developer API Keys</h3>
+  <p>Users can generate API keys from the <strong>Developer Settings</strong> page (<code>/app/:userId/developer</code>).</p>
+
+  <h4>Creating an API Key (via UI)</h4>
+  <ol>
+    <li>Navigate to Developer Settings</li>
+    <li>Click "Create New API Key"</li>
+    <li>Enter a name and select scopes</li>
+    <li>Copy the full key immediately — it will only be shown once</li>
+  </ol>
+
+  <h4>Using the API Key</h4>
+  <pre><span class="cm"># List transactions</span>
+<span class="fn">curl</span> <span class="str">https://your-api.com/api/v1/transactions</span> \
+  -H <span class="str">"X-API-Key: ak_your_key_here"</span>
+
+<span class="cm"># Create a transaction</span>
+<span class="fn">curl</span> -X POST <span class="str">https://your-api.com/api/v1/transactions</span> \
+  -H <span class="str">"X-API-Key: ak_your_key_here"</span> \
+  -H <span class="str">"Content-Type: application/json"</span> \
+  -d <span class="str">'{"date":"2026-06-01","desc":"Office rent","amount":1200,"type":"expense","category":"Rent"}'</span>
+
+<span class="cm"># Get dashboard KPIs</span>
+<span class="fn">curl</span> <span class="str">https://your-api.com/api/v1/dashboard</span> \
+  -H <span class="str">"X-API-Key: ak_your_key_here"</span></pre>
+
+  <h4>Available Scopes</h4>
+  <table>
+    <thead><tr><th>Scope</th><th>Access</th></tr></thead>
+    <tbody>
+      <tr><td><code>transactions:read</code></td><td>List and retrieve transactions</td></tr>
+      <tr><td><code>transactions:write</code></td><td>Create, update, delete transactions</td></tr>
+      <tr><td><code>dashboard:read</code></td><td>Read KPI dashboard data</td></tr>
+      <tr><td><code>excel:read</code></td><td>Download Excel files</td></tr>
+      <tr><td><code>excel:write</code></td><td>Upload and modify Excel files</td></tr>
+      <tr><td><code>chatbot:read</code></td><td>Access chatbot and chat history</td></tr>
+    </tbody>
+  </table>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════════
+     SECTION 9 – DEPLOYMENT
+══════════════════════════════════════════════════════════════════ -->
+<div class="section" id="deployment">
+  <div class="section-header">
+    <div class="section-icon icon-purple">🚀</div>
+    <h2>9. Deployment</h2>
+  </div>
+
+  <h3>9.1 Backend Deployment (Render / Railway / Fly.io)</h3>
+  <ol>
+    <li>Set all required environment variables in the platform dashboard</li>
+    <li>Set <code>NODE_ENV=production</code></li>
+    <li>Start command: <code>node server.js</code> from the <code>backend/</code> directory</li>
+    <li>Set <code>CLIENT_URL</code> to your frontend domain</li>
+    <li>The <code>/health</code> endpoint serves as the health check URL</li>
+  </ol>
+
+  <h3>9.2 Frontend Deployment (Vercel / Netlify / GitHub Pages)</h3>
+  <ol>
+    <li>Set the build command to <code>npm run build</code> in the <code>frontend/</code> directory</li>
+    <li>Set the publish directory to <code>frontend/dist</code></li>
+    <li>Create <code>frontend/.env.production</code> with: <code>VITE_API_URL=https://your-backend-url.com</code></li>
+    <li>Configure SPA fallback: all routes → <code>index.html</code></li>
+  </ol>
+
+  <h3>9.3 Production Checklist</h3>
+  <table>
+    <thead><tr><th>Item</th><th>Action</th></tr></thead>
+    <tbody>
+      <tr><td>JWT Secret</td><td>Generate a strong random secret (64+ chars) — do not use the dev fallback</td></tr>
+      <tr><td>MongoDB URI</td><td>Use MongoDB Atlas with TLS enabled; restrict IP allowlist</td></tr>
+      <tr><td>CORS Origin</td><td>Set <code>CLIENT_URL</code> to your exact frontend domain (no trailing slash)</td></tr>
+      <tr><td>Rate Limiting</td><td>Enabled automatically when <code>NODE_ENV=production</code></td></tr>
+      <tr><td>Email Service</td><td>Configure Resend API key or SMTP credentials for password reset emails</td></tr>
+      <tr><td>Admin Emails</td><td>Set <code>ADMIN_EMAILS</code> to restrict admin panel access</td></tr>
+      <tr><td>File Storage</td><td>Consider S3 or similar for uploaded files in multi-instance deployments</td></tr>
+    </tbody>
+  </table>
+
+  <div class="info-box warn">
+    <div class="icon">⚠️</div>
+    <div class="text">
+      <strong>Local File Stores in Production</strong>
+      The local JSON-based data stores (usage, subscriptions, auth fallback) write to the server filesystem. These are not suitable for multi-instance deployments. Ensure MongoDB is connected in production so all data uses the database.
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════════
+     SECTION 10 – EMAIL SERVICE
+══════════════════════════════════════════════════════════════════ -->
+<div class="section" id="email">
+  <div class="section-header">
+    <div class="section-icon icon-blue">✉️</div>
+    <h2>10. Email Service</h2>
+  </div>
+
+  <p>Email is handled by <code>backend/services/emailService.js</code> which supports two providers with automatic fallback:</p>
+
+  <div class="card-grid card-grid-2">
+    <div class="card">
+      <div class="card-title">📬 Resend (Primary)</div>
+      <p>Modern email API. Configure with <code>RESEND_API_KEY</code>. Preferred for production use. Supports custom domains with SPF/DKIM configuration.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">📧 Nodemailer (Fallback)</div>
+      <p>SMTP-based email. Configure with <code>SMTP_HOST</code>, <code>SMTP_PORT</code>, <code>SMTP_USER</code>, <code>SMTP_PASS</code>. Works with Gmail, SendGrid, Mailgun, etc.</p>
+    </div>
+  </div>
+
+  <h4>Triggered Emails</h4>
+  <table>
+    <thead><tr><th>Event</th><th>Template</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>Password Reset Request</td><td>HTML email with reset link</td><td>Token expires in 1 hour. Link format: <code>/reset-password/:token</code></td></tr>
+    </tbody>
+  </table>
+
+  <h4>Development Mode</h4>
+  <div class="info-box info">
+    <div class="icon">💡</div>
+    <div class="text">
+      <strong>Console Fallback in Development</strong>
+      When no email provider is configured, the email service logs the reset token directly to the server console. This allows testing the password reset flow without email credentials.
+    </div>
+  </div>
+
+  <div class="page-footer">
+    <span>AI Accountant — Graduation Project · Akhbar El-Youm Academy</span>
+    <span>Faculty of Computer Science · Academic Year 2025/2026</span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     SECTION 11 – CONCLUSION & FUTURE WORK
+══════════════════════════════════════════════════════════════════ -->
+<div class="section" id="conclusion">
+  <div class="section-header">
+    <div class="section-icon icon-blue">🎓</div>
+    <h2>11. Conclusion &amp; Future Work</h2>
+  </div>
+
+  <h3>11.1 Conclusion</h3>
+  <p>
+    This graduation project has demonstrated the technical feasibility and practical value of integrating large language model (LLM) capabilities within a conventional financial management software architecture. The AI Accountant system successfully achieves all primary research objectives: it provides SME operators with real-time financial dashboards and KPI analytics, enables AI-driven natural-language querying via a conversational chatbot interface, automates transaction extraction from uploaded documents using Google Gemini's multi-modal analysis capabilities, and generates fully formatted spreadsheets from plain-text descriptions using the Groq LLaMA 3.3-70B inference engine.
+  </p>
+  <p>
+    The implementation adheres to contemporary software engineering best practices, including layered RESTful API design, stateless JWT-based authentication, scope-controlled API key authorization, bcrypt password hashing, and a defense-in-depth HTTP security model enforced through the Helmet middleware suite. The dual data-store architecture — which transparently falls back to a local JSON-based persistence layer in the absence of a live MongoDB connection — substantially reduces the barrier to entry for local development and testing workflows, representing a pragmatic engineering contribution.
+  </p>
+  <p>
+    The tiered subscription model demonstrates a commercially viable pathway for platform monetization, while the versioned public REST API (v1) with scope-based API key authentication enables programmatic third-party developer integration. Collectively, this system constitutes a meaningful contribution at the intersection of enterprise web engineering and applied artificial intelligence, particularly within the domain of SME financial management.
+  </p>
+
+  <h3>11.2 Limitations</h3>
+  <div class="card-grid card-grid-2">
+    <div class="card">
+      <div class="card-title">⚠️ Simulated Payment Processing</div>
+      <p>The subscription billing module employs a simulated payment flow rather than a live payment gateway integration. Real-world deployment would necessitate integration with a PCI-DSS-compliant payment processor such as Stripe or PayPal, and would require handling recurring billing, refunds, and dispute resolution.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">⚠️ Local File Storage</div>
+      <p>Uploaded files and the JSON-based usage store are persisted on the local server filesystem, which is incompatible with horizontally scaled, multi-instance deployment environments. A distributed object storage solution (e.g., Amazon S3, Google Cloud Storage) would be required for production-scale, high-availability deployments.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">⚠️ External AI Dependency</div>
+      <p>All AI feature responses are contingent on the availability of external API services from Groq and Google Gemini, and are subject to third-party rate limits, inference latency, and pricing changes. High-concurrency scenarios may experience elevated response times on AI-powered endpoints.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">⚠️ Single-Tenant Data Model</div>
+      <p>The current data model is designed for single-user tenancy, with data isolation enforced by authenticated user ID. Support for organizational accounts, multi-user collaborative teams, or enterprise multi-tenancy would require substantial schema redesign and role-based access control enhancements.</p>
+    </div>
+  </div>
+
+  <h3>11.3 Future Work</h3>
+  <p>The following directions are identified as high-priority areas for future research and development:</p>
+  <ul>
+    <li><strong>Live Payment Gateway Integration:</strong> Replacing the simulated checkout flow with a production-grade, PCI-DSS-compliant payment processor to enable real subscription revenue collection and automated recurring billing management.</li>
+    <li><strong>Automated Tax Reporting:</strong> Extending the KPI analytics engine to generate jurisdiction-specific tax reports and integrate with government electronic filing APIs (e.g., VAT returns, income tax declarations).</li>
+    <li><strong>OCR Enhancement for Scanned Documents:</strong> Implementing Optical Character Recognition (OCR) post-processing to improve transaction extraction accuracy from scanned or image-based PDF financial documents where embedded text is unavailable.</li>
+    <li><strong>Multi-Currency &amp; Localization Support:</strong> Incorporating real-time foreign exchange rate feeds and locale-aware number formatting to support multi-currency transaction recording and consolidated international financial reporting.</li>
+    <li><strong>Mobile Application Development:</strong> Developing a cross-platform companion mobile application (React Native or Flutter) to extend platform accessibility to mobile business operators and enable push-notification financial alerts.</li>
+    <li><strong>Predictive Financial Analytics:</strong> Applying time-series forecasting models (e.g., ARIMA, LSTM neural networks) to historical transaction data in order to project future cash flow, revenue trends, and expense trajectories.</li>
+    <li><strong>Domain-Specific Model Fine-Tuning:</strong> Fine-tuning a compact language model on accounting and financial domain corpora to reduce dependency on general-purpose third-party API services and improve the accuracy of domain-specific financial reasoning and categorization.</li>
+    <li><strong>Comprehensive Audit Trail &amp; Regulatory Compliance:</strong> Implementing a tamper-evident, append-only audit log for all financial record modifications to satisfy regulatory compliance requirements such as Sarbanes-Oxley (SOX) and International Financial Reporting Standards (IFRS).</li>
+  </ul>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     SECTION 12 – REFERENCES & BIBLIOGRAPHY
+══════════════════════════════════════════════════════════════════ -->
+<div class="section" id="references">
+  <div class="section-header">
+    <div class="section-icon icon-gray">📚</div>
+    <h2>12. References &amp; Bibliography</h2>
+  </div>
+
+  <h3>12.1 Frameworks &amp; Libraries</h3>
+  <ol>
+    <li>Meta Platforms Inc. <em>React — A JavaScript library for building user interfaces</em>. Version 19.0. [Online]. Available: https://react.dev [Accessed June 2026].</li>
+    <li>OpenJS Foundation. <em>Node.js — JavaScript runtime built on Chrome's V8 JavaScript engine</em>. Version 20 LTS. [Online]. Available: https://nodejs.org [Accessed June 2026].</li>
+    <li>T. Holowaychuk. <em>Express — Fast, unopinionated, minimalist web framework for Node.js</em>. Version 5.0. [Online]. Available: https://expressjs.com [Accessed June 2026].</li>
+    <li>MongoDB Inc. <em>MongoDB — The Developer Data Platform</em>. [Online]. Available: https://www.mongodb.com [Accessed June 2026].</li>
+    <li>Automattic Inc. <em>Mongoose — Elegant MongoDB Object Modeling for Node.js</em>. Version 8. [Online]. Available: https://mongoosejs.com [Accessed June 2026].</li>
+    <li>E. You. <em>Vite — Next Generation Frontend Tooling</em>. Version 7.0. [Online]. Available: https://vitejs.dev [Accessed June 2026].</li>
+    <li>A. Wathan. <em>Tailwind CSS — A Utility-First CSS Framework for Rapid UI Development</em>. Version 4. [Online]. Available: https://tailwindcss.com [Accessed June 2026].</li>
+    <li>Recharts Team. <em>Recharts — Redefined Chart Library Built with React and D3</em>. [Online]. Available: https://recharts.org [Accessed June 2026].</li>
+    <li>ExcelJS Contributors. <em>ExcelJS — Excel Workbook Manager for Node.js</em>. [Online]. Available: https://github.com/exceljs/exceljs [Accessed June 2026].</li>
+    <li>Auth0 Inc. <em>node-jsonwebtoken — JSON Web Token Implementation for Node.js</em>. [Online]. Available: https://github.com/auth0/node-jsonwebtoken [Accessed June 2026].</li>
+    <li>TanStack. <em>TanStack Query (React Query) — Powerful Asynchronous State Management for TypeScript/JavaScript</em>. Version 5. [Online]. Available: https://tanstack.com/query [Accessed June 2026].</li>
+    <li>P. Krzysztof and contributors. <em>Zustand — A Small, Fast, and Scalable State Management Solution for React</em>. [Online]. Available: https://github.com/pmndrs/zustand [Accessed June 2026].</li>
+  </ol>
+
+  <h3>12.2 AI Services &amp; Academic References</h3>
+  <ol start="13">
+    <li>Groq Inc. <em>Groq API Documentation — LLaMA 3.3-70B Versatile Model Reference</em>. [Online]. Available: https://console.groq.com/docs [Accessed June 2026].</li>
+    <li>Meta AI Research. <em>The Llama 3 Herd of Models</em>. arXiv preprint arXiv:2407.21783, 2024. [Online]. Available: https://arxiv.org/abs/2407.21783</li>
+    <li>Google DeepMind. <em>Gemini: A Family of Highly Capable Multimodal Models</em>. arXiv preprint arXiv:2312.11805, 2023. [Online]. Available: https://arxiv.org/abs/2312.11805</li>
+    <li>Google Inc. <em>Google AI for Developers — Gemini API Documentation</em>. [Online]. Available: https://ai.google.dev [Accessed June 2026].</li>
+    <li>T. Brown, B. Mann, N. Ryder et al. <em>Language Models are Few-Shot Learners</em>. Advances in Neural Information Processing Systems (NeurIPS), vol. 33, pp. 1877–1901, 2020.</li>
+    <li>A. Vaswani, N. Shazeer, N. Parmar et al. <em>Attention Is All You Need</em>. Advances in Neural Information Processing Systems (NeurIPS), vol. 30, 2017.</li>
+  </ol>
+
+  <h3>12.3 Security Standards &amp; Protocols</h3>
+  <ol start="19">
+    <li>OWASP Foundation. <em>OWASP Top Ten — The Ten Most Critical Web Application Security Risks</em>. 2021 Edition. [Online]. Available: https://owasp.org/www-project-top-ten [Accessed June 2026].</li>
+    <li>M. Jones, J. Bradley, and N. Sakimura. <em>RFC 7519: JSON Web Token (JWT)</em>. Internet Engineering Task Force (IETF), May 2015. [Online]. Available: https://tools.ietf.org/html/rfc7519</li>
+    <li>N. Provos and D. Mazières. <em>A Future-Adaptable Password Scheme</em>. Proceedings of the USENIX Annual Technical Conference (FREENIX Track), 1999, pp. 32–32.</li>
+    <li>R. T. Fielding. <em>Architectural Styles and the Design of Network-Based Software Architectures</em>. Ph.D. Dissertation, University of California, Irvine, 2000.</li>
+    <li>D. Hardt. <em>RFC 6749: The OAuth 2.0 Authorization Framework</em>. Internet Engineering Task Force (IETF), October 2012. [Online]. Available: https://tools.ietf.org/html/rfc6749</li>
+  </ol>
+
+  <h3>12.4 Related Systems &amp; Comparative Platforms</h3>
+  <ol start="24">
+    <li>Intuit Inc. <em>QuickBooks Online — Cloud-Based Small Business Accounting Software</em>. [Online]. Available: https://quickbooks.intuit.com [Accessed June 2026].</li>
+    <li>Xero Ltd. <em>Xero — Online Accounting Software for Small Business</em>. [Online]. Available: https://www.xero.com [Accessed June 2026].</li>
+    <li>Wave Financial Inc. <em>Wave — Free Accounting and Invoicing Software for Small Business</em>. [Online]. Available: https://www.waveapps.com [Accessed June 2026].</li>
+  </ol>
+
+  <div class="page-footer">
+    <span>AI Accountant — Graduation Project · Akhbar El-Youm Academy</span>
+    <span>Faculty of Computer Science · Academic Year 2025/2026</span>
+  </div>
+</div>
+
+</body>
+</html>

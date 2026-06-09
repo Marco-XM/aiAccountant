@@ -1,6 +1,7 @@
 const express = require("express");
 const authMiddleware = require("../middleware/auth.mw");
 const asyncHandler = require("../middleware/asyncHandler");
+const checkLimit = require("../middleware/checkLimit.mw");
 const { z } = require("zod");
 const { validateQuery } = require("../middleware/validateRequest");
 const {
@@ -28,7 +29,7 @@ const router = express.Router();
 router.use(authMiddleware);
 
 // POST /api/transactions/upload - Upload and analyze file
-router.post("/upload", upload.single("file"), asyncHandler(uploadAndAnalyzeFile));
+router.post("/upload", checkLimit("excelUploads"), upload.single("file"), asyncHandler(uploadAndAnalyzeFile));
 
 // Background import job routes
 router.post("/import-jobs", asyncHandler(createImportJob));
@@ -39,7 +40,7 @@ router.post("/import-jobs/:jobId/finalize", asyncHandler(finalizeImportJob));
 router.post("/import-jobs/:jobId/retry", asyncHandler(retryImportChunks));
 router.post("/import-jobs/:jobId/cancel", asyncHandler(cancelImportJob));
 
-// POST /api/transactions - Create a manual transaction
+// POST /api/transactions - Create a manual transaction (limit-checked)
 // Validate query helper for GET list
 const transactionsQuerySchema = z.object({
   limit: z
@@ -65,7 +66,7 @@ const transactionsQuerySchema = z.object({
   direction: z.enum(["asc", "desc"]).optional(),
 });
 
-router.post("/", asyncHandler(createTransaction));
+router.post("/", checkLimit("transactions"), asyncHandler(createTransaction));
 
 // GET /api/transactions - Get all transactions for user
 router.get("/", validateQuery(transactionsQuerySchema), asyncHandler(getTransactions));

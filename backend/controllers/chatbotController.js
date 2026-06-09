@@ -1,13 +1,16 @@
 const Groq = require('groq-sdk');
 const Transaction = require('../models/Transaction');
 const mongoose = require('mongoose');
+const usageService = require('../services/usageService');
+const localTransactionStore = require('../services/localTransactionStore');
+const { isMongoObjectId } = require('../services/userIdentity');
 
 // Initialize Groq AI
 const groq = new Groq({
     apiKey: process.env.GROQ_API_KEY
 });
 
-// Single flexible function to query transactions
+// Single flexible function to query transactions (supports both MongoDB and local-store users)
 const queryTransactions = async (userId, query) => {
     const { 
         startDate, 
@@ -20,6 +23,74 @@ const queryTransactions = async (userId, query) => {
         includeTransactions = false
     } = query;
 
+    // ── Local file-store path (dev / non-MongoDB users) ──────────────────────
+    if (!isMongoObjectId(userId)) {
+        const { transactions } = await localTransactionStore.listTransactions({
+            userId: String(userId),
+            type,
+            category,
+            dateFrom: startDate,
+            dateTo: endDate,
+            limit: 5000,
+        });
+
+        if (groupBy) {
+            const groups = {};
+            for (const t of transactions) {
+                let key;
+                if (groupBy === 'category') {
+                    key = t.category || 'Uncategorized';
+                } else if (groupBy === 'month') {
+                    const d = new Date(t.date);
+                    key = isNaN(d.getTime()) ? 'Unknown'
+                        : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                } else if (groupBy === 'type') {
+                    key = t.type || 'expense';
+                } else {
+                    key = 'all';
+                }
+                if (!groups[key]) groups[key] = { total: 0, count: 0 };
+                groups[key].total += Math.abs(Number(t.amount) || 0);
+                groups[key].count += 1;
+            }
+
+            let results = Object.entries(groups).map(([k, v]) => ({
+                [groupBy]: k, total: v.total, count: v.count,
+            }));
+            if (sortBy === 'amount') results.sort((a, b) => b.total - a.total);
+            else if (sortBy === 'count') results.sort((a, b) => b.count - a.count);
+            if (limit) results = results.slice(0, parseInt(limit));
+
+            return { grouped: true, groupBy, results };
+        }
+
+        // Flat summary
+        const summary = {
+            totalTransactions: transactions.length,
+            totalAmount: 0, totalIncome: 0, totalExpenses: 0,
+            categories: {},
+            dateRange: { startDate, endDate },
+        };
+        for (const t of transactions) {
+            const amt = Math.abs(Number(t.amount) || 0);
+            summary.totalAmount += amt;
+            if (t.type === 'income') summary.totalIncome += amt;
+            else if (t.type === 'expense') summary.totalExpenses += amt;
+            const cat = t.category || 'Uncategorized';
+            if (!summary.categories[cat]) summary.categories[cat] = { total: 0, count: 0 };
+            summary.categories[cat].total += amt;
+            summary.categories[cat].count += 1;
+        }
+        if (includeTransactions) {
+            summary.transactions = transactions.slice(0, 20).map(t => ({
+                date: t.date, description: t.desc, category: t.category,
+                type: t.type, amount: t.amount,
+            }));
+        }
+        return summary;
+    }
+
+    // ── MongoDB path ─────────────────────────────────────────────────────────
     // Build match filter
     const matchFilter = {
         userId: new mongoose.Types.ObjectId(userId)
@@ -154,17 +225,17 @@ const tools = [
                     type: {
                         type: "string",
                         enum: ["income", "expense"],
-                        description: "Filter by transaction type: income or expense (optional)"
+                        description: "Filter by transaction type: 'income' or 'expense'. OMIT this field entirely if not filtering by type — do NOT pass null."
                     },
                     groupBy: {
                         type: "string",
                         enum: ["category", "month", "type"],
-                        description: "Group results by: category, month, or type (optional)"
+                        description: "Group results by: category, month, or type. OMIT if not grouping — do NOT pass null."
                     },
                     sortBy: {
                         type: "string",
                         enum: ["amount", "date", "count"],
-                        description: "Sort results by: amount, date, or count (optional, default: date)"
+                        description: "Sort results by: amount, date, or count (default: date). OMIT if using default — do NOT pass null."
                     },
                     limit: {
                         type: "number",
@@ -196,64 +267,32 @@ const chat = async (req, res) => {
         console.log('Chat request from user:', userId);
         console.log('User message:', message);
 
-        // System context
-        const systemContext = `You are a professional accountant assistant helping analyze financial data.
+        // System context — kept concise to minimise token usage
+        const systemContext = `You are a professional accountant assistant. Use the queryTransactions function to answer financial questions.
 
-FORMATTING RULES:
-- Use **bold text** for important numbers and key metrics (e.g., **$125,432.50**)
-- Use ## for section headers (e.g., ## Q1 2024 Performance Summary)
-- Use bullet points (•) for lists
-- Format currency with dollar signs and commas (e.g., $1,234.56)
-- Keep responses well-structured with clear sections
-- Add brief insights and recommendations at the end
+FORMATTING: Use **bold** for key numbers, ## for headers, • for lists, $1,234.56 for currency. Add brief insights at the end.
 
-QUARTER DEFINITIONS:
-Q1 = January-March, Q2 = April-June, Q3 = July-September, Q4 = October-December
+QUARTERS: Q1=Jan-Mar, Q2=Apr-Jun, Q3=Jul-Sep, Q4=Oct-Dec.
 
-DATA QUERYING STRATEGY:
-You have ONE powerful function called "queryTransactions" that can handle ANY type of financial query.
+QUERY RULES:
+- "income/revenue" → type:"income" | "expense/spending" → type:"expense"
+- Use groupBy:"category" for summaries, groupBy:"month" for trends
+- Set includeTransactions:false unless user needs individual transactions
+- For period comparisons (e.g. 2024 vs 2023) make SEPARATE calls per period
+- Prefer ONE optimised call when possible
+- IMPORTANT: Omit optional parameters entirely — never pass null for any field
 
-CRITICAL: When user mentions "income" or "revenue", ALWAYS add type: "income"
-CRITICAL: When user mentions "expense" or "spending", ALWAYS add type: "expense"
-
-EXAMPLES:
-1. "Show me Q1 performance" → queryTransactions({ startDate: "2024-01-01", endDate: "2024-03-31" })
-2. "What are top expense categories?" → queryTransactions({ type: "expense", groupBy: "category", sortBy: "amount", limit: 10 })
-3. "Income by category for Q2" → queryTransactions({ type: "income", startDate: "2024-04-01", endDate: "2024-06-30", groupBy: "category", sortBy: "amount" })
-4. "Show travel expenses" → queryTransactions({ category: "Travel", type: "expense" })
-5. "Monthly breakdown for 2024" → queryTransactions({ startDate: "2024-01-01", endDate: "2024-12-31", groupBy: "month" })
-6. "Show all categories" → queryTransactions({ groupBy: "category", sortBy: "amount" })
-7. "Best product in 2024 and 2023" → Make TWO calls:
-   - queryTransactions({ type: "income", startDate: "2024-01-01", endDate: "2024-12-31", groupBy: "category", sortBy: "amount" })
-   - queryTransactions({ type: "income", startDate: "2023-01-01", endDate: "2023-12-31", groupBy: "category", sortBy: "amount" })
-
-RESPONSE STRATEGY:
-- Use groupBy: "category" to get category-level summaries (faster, less data)
-- Set includeTransactions: false unless user explicitly needs transaction details
-- For year-over-year or period comparisons: Make SEPARATE calls for each period (don't combine date ranges)
-- For single period analysis: Make ONE call with appropriate filters
-- Pay attention to keywords: "income", "revenue" (type: "income") vs "expense", "spending" (type: "expense")
-- Analyze the returned data yourself and present findings in well-formatted markdown
-
-WHEN TO MAKE MULTIPLE CALLS:
-- Comparing different time periods (2024 vs 2023, Q1 vs Q2, etc.) → separate calls for each period
-- Comparing income vs expenses → separate calls with type filter
-- Getting different groupings → separate calls with different groupBy values
-- Otherwise, prefer a single optimized call
-
-IMPORTANT - SUGGESTED QUESTIONS:
-After your main response, you MUST generate 3-4 relevant follow-up questions that the user might ask based on the current conversation.
-Add these questions at the END of your response after a special marker: "---SUGGESTED---"
-Format them as a JSON array like this:
+SUGGESTED QUESTIONS: End every response with ---SUGGESTED--- then a JSON array of 3-4 follow-up questions:
 ---SUGGESTED---
-["Question 1?", "Question 2?", "Question 3?", "Question 4?"]
+["Question 1?", "Question 2?", "Question 3?"]
 
 Current date: ${new Date().toISOString().split('T')[0]}`;
 
-        // Build messages array for Groq
+        // Build messages array for Groq — limit history to last 8 messages to cap token usage
+        const trimmedHistory = conversationHistory.slice(-8);
         const messages = [
             { role: "system", content: systemContext },
-            ...conversationHistory.map(msg => ({
+            ...trimmedHistory.map(msg => ({
                 role: msg.role === 'model' ? 'assistant' : msg.role,
                 content: msg.content
             })),
@@ -271,8 +310,8 @@ Current date: ${new Date().toISOString().split('T')[0]}`;
                 messages: messages,
                 tools: tools,
                 tool_choice: "auto",
-                temperature: 0.5,
-                max_tokens: 2048
+                temperature: 0.3,
+                max_tokens: 1024
             });
 
             const responseMessage = completion.choices[0].message;
@@ -307,11 +346,13 @@ Current date: ${new Date().toISOString().split('T')[0]}`;
                     console.log(`Function ${functionName} result:`, result);
                     
                     // Add function result to messages
+                    // Cap tool result size to avoid token spikes
+                    const resultStr = JSON.stringify(result);
                     messages.push({
                         role: "tool",
                         tool_call_id: toolCall.id,
                         name: functionName,
-                        content: JSON.stringify(result)
+                        content: resultStr.length > 4000 ? resultStr.slice(0, 4000) + '…}' : resultStr
                     });
                 } catch (error) {
                     console.error(`Error calling function ${functionName}:`, error);
@@ -352,6 +393,8 @@ Current date: ${new Date().toISOString().split('T')[0]}`;
                 { role: 'model', content: cleanMessage }
             ]
         });
+        // Increment usage after successful response
+        usageService.increment(req.user?._id, 'aiChatMessages').catch(() => {});
 
     } catch (error) {
         console.error('Chat error:', error);

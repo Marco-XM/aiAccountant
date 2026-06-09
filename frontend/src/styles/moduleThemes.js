@@ -5,7 +5,7 @@ export const DashboardTheme = {
   // Executive: spacious, centered container with adaptive max-widths
   // Container centers content and prevents infinite stretching on ultra-wide screens
   container:
-    "mx-auto max-w-[1100px] sm:max-w-[1200px] lg:max-w-[1400px] xl:max-w-[1700px] 2xl:max-w-[2200px] bg-gradient-to-b from-slate-900/95 to-slate-900/98 py-10 px-6",
+    "mx-auto max-w-[1100px] sm:max-w-[1200px] lg:max-w-[1400px] xl:max-w-[1700px] 2xl:max-w-[2200px] py-10 px-6",
   header: "mb-6",
   density: "space-y-6",
   // KPI band: responsive KPI grid that adapts from mobile through wide screens
@@ -19,14 +19,14 @@ export const DashboardTheme = {
 };
 
 export const TransactionsTheme = {
-  container: "bg-slate-900/95 p-2", // darker, compact
+  container: "p-2",
   header: "mb-2",
   density: "space-y-2 text-sm",
-  gridContainer: "rounded-md border border-white/6 bg-slate-950/80 p-2",
+  gridContainer: "rounded-md border border-[rgba(10,36,99,0.10)] bg-white/80 p-2",
 };
 
 export const AIChartsTheme = {
-  container: "bg-gradient-to-b from-slate-900/80 to-slate-900/95 p-6",
+  container: "p-6",
   header: "mb-4",
   density: "space-y-5",
   immersive: "max-w-[1600px] mx-auto",

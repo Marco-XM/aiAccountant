@@ -1,17 +1,25 @@
-// frontend/src/components/ExcelEditor/ExcelUploadPage.jsx
-import React, { useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useRef, useState, useContext } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import excelApi from '../../services/api/excelApi';
+import { AuthContext } from '../../Context/AuthContext';
+import { useSubscription } from '../../Context/SubscriptionContext';
 
 export default function ExcelUploadPage() {
   const navigate = useNavigate();
+  const { userId } = useContext(AuthContext);
+  const { isAtLimit, usage, planDetails } = useSubscription();
+  const uploadAtLimit = isAtLimit('excelUploads');
   const fileInputRef = useRef(null);
   const [isLoading, setIsLoading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
 
   const handleFileSelect = async (file) => {
     if (!file) return;
+    if (uploadAtLimit) {
+      toast.error(`You've reached your Excel upload limit. Upgrade your plan to upload more files.`);
+      return;
+    }
 
     // Validate file
     const ext = file.name.split('.').pop().toLowerCase();
@@ -30,7 +38,7 @@ export default function ExcelUploadPage() {
     try {
       const response = await excelApi.uploadFile(file);
       toast.success('File uploaded successfully!');
-      navigate(`/excel/${response.fileId}`);
+      navigate(`/app/${userId}/excel/${response.fileId}`);
     } catch (error) {
       console.error('Upload error:', error);
       toast.error(`Upload failed: ${error.message}`);
@@ -92,7 +100,7 @@ export default function ExcelUploadPage() {
             accept=".xlsx,.xls,.csv"
             onChange={(e) => handleFileSelect(e.target.files?.[0])}
             className="hidden"
-            disabled={isLoading}
+            disabled={isLoading || uploadAtLimit}
           />
 
               <div className="mb-5 flex justify-center">
@@ -112,14 +120,21 @@ export default function ExcelUploadPage() {
               </div>
 
               <h3 className="text-2xl font-semibold text-slate-900 dark:text-white">
-            {isLoading ? 'Uploading...' : 'Drop your Excel file here'}
+            {isLoading ? 'Uploading...' : uploadAtLimit ? 'Upload limit reached' : 'Drop your Excel file here'}
           </h3>
+
+              {uploadAtLimit && (
+                <div className="mt-4 rounded-xl px-4 py-3 text-sm font-medium flex items-center justify-center gap-3" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", color: "#dc2626" }}>
+                  <span>You've used {usage.excelUploads || 0}/{planDetails?.limits?.excelUploads} Excel uploads this month.</span>
+                  <Link to={`/app/${userId}/subscription`} className="shrink-0 underline font-semibold hover:opacity-80">Upgrade plan</Link>
+                </div>
+              )}
 
               <p className="mt-3 text-slate-600 dark:text-slate-300">
             or{' '}
             <button
               onClick={() => fileInputRef.current?.click()}
-              disabled={isLoading}
+              disabled={isLoading || uploadAtLimit}
                   className="font-medium text-blue-600 underline decoration-blue-300 decoration-2 underline-offset-4 transition hover:text-blue-700 disabled:opacity-50"
             >
               browse your computer

@@ -4,6 +4,7 @@ const authMiddleware = require('../middleware/auth.mw');
 const Chat = require('../models/Chat');
 const mongoose = require('mongoose');
 const { isMongoObjectId } = require('../services/userIdentity');
+const localChatStore = require('../services/localChatStore');
 
 const isDatabaseReady = () => mongoose.connection.readyState === 1;
 const canUseMongoChat = (userId) => isDatabaseReady() && isMongoObjectId(userId);
@@ -12,7 +13,8 @@ const canUseMongoChat = (userId) => isDatabaseReady() && isMongoObjectId(userId)
 router.get('/sessions', authMiddleware, async (req, res) => {
   try {
     if (!canUseMongoChat(req.user._id)) {
-      return res.json([]);
+      const sessions = await localChatStore.getSessions(req.user._id);
+      return res.json(sessions);
     }
 
     const chats = await Chat.find({ userId: req.user._id })
@@ -25,13 +27,15 @@ router.get('/sessions', authMiddleware, async (req, res) => {
     console.error('Error fetching chat sessions:', error);
     res.status(500).json({ error: 'Failed to fetch chat sessions' });
   }
-});
+})
 
 // Get a specific chat session
 router.get('/sessions/:id', authMiddleware, async (req, res) => {
   try {
     if (!canUseMongoChat(req.user._id)) {
-      return res.status(404).json({ error: 'Chat not found' });
+      const session = await localChatStore.getSession(req.params.id, req.user._id);
+      if (!session) return res.status(404).json({ error: 'Chat not found' });
+      return res.json(session);
     }
 
     const chat = await Chat.findOne({ 
@@ -48,13 +52,14 @@ router.get('/sessions/:id', authMiddleware, async (req, res) => {
     console.error('Error fetching chat:', error);
     res.status(500).json({ error: 'Failed to fetch chat' });
   }
-});
+})
 
 // Create new chat session
 router.post('/sessions', authMiddleware, async (req, res) => {
   try {
     if (!canUseMongoChat(req.user._id)) {
-      return res.status(503).json({ error: 'Chat sessions require a MongoDB-backed user account' });
+      const session = await localChatStore.createSession(req.user._id, req.body.title);
+      return res.json(session);
     }
 
     const { title } = req.body;
@@ -71,13 +76,15 @@ router.post('/sessions', authMiddleware, async (req, res) => {
     console.error('Error creating chat:', error);
     res.status(500).json({ error: 'Failed to create chat' });
   }
-});
+})
 
 // Update chat session (save messages)
 router.put('/sessions/:id', authMiddleware, async (req, res) => {
   try {
     if (!canUseMongoChat(req.user._id)) {
-      return res.status(503).json({ error: 'Chat sessions require a MongoDB-backed user account' });
+      const session = await localChatStore.updateSession(req.params.id, req.user._id, req.body);
+      if (!session) return res.status(404).json({ error: 'Chat not found' });
+      return res.json(session);
     }
 
     const { messages, title, suggestedQuestions } = req.body;
@@ -107,7 +114,9 @@ router.put('/sessions/:id', authMiddleware, async (req, res) => {
 router.delete('/sessions/:id', authMiddleware, async (req, res) => {
   try {
     if (!canUseMongoChat(req.user._id)) {
-      return res.status(503).json({ error: 'Chat sessions require a MongoDB-backed user account' });
+      const removed = await localChatStore.deleteSession(req.params.id, req.user._id);
+      if (!removed) return res.status(404).json({ error: 'Chat not found' });
+      return res.json({ message: 'Chat deleted successfully' });
     }
 
     const chat = await Chat.findOneAndDelete({ 

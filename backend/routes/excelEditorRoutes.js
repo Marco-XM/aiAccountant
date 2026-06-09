@@ -1,7 +1,6 @@
 // routes/excelEditorRoutes.js
 const express = require('express');
 const multer = require('multer');
-const os = require('os');
 const path = require('path');
 const auth = require('../middleware/auth.mw');
 const excelController = require('../controllers/excelEditorController');
@@ -10,7 +9,7 @@ const router = express.Router();
 
 // Configure multer for file uploads
 const upload = multer({
-  dest: os.tmpdir(),
+  dest: 'uploads/excel/',
   limits: {
     fileSize: 50 * 1024 * 1024, // 50MB
   },

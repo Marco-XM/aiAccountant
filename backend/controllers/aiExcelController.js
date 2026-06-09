@@ -2,6 +2,7 @@ const Groq = require('groq-sdk');
 const ExcelJS = require('exceljs');
 const path = require('path');
 const fs = require('fs');
+const usageService = require('../services/usageService');
 
 // Initialize Groq AI
 const groq = new Groq({
@@ -448,6 +449,8 @@ const generateExcelWithAI = async (req, res) => {
             downloadUrl: `/api/ai-excel/download/${fileName}`,
             config: excelConfig
         });
+        // Increment usage after successful generation
+        usageService.increment(req.user?._id, 'aiExcelGenerations').catch(() => {});
 
     } catch (error) {
         console.error('Error generating Excel:', error);

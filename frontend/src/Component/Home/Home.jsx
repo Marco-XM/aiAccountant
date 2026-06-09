@@ -19,6 +19,7 @@ import toast from "react-hot-toast";
 import { AuthContext } from "../../Context/AuthContext";
 import { api } from "../../config/api";
 import { useBackendHealth } from "../../Context/BackendHealthContext";
+import { useTheme } from "../../Context/ThemeContext";
 
 const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const compact = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
@@ -188,21 +189,17 @@ const Heatmap = ({ data = [] }) => {
 const Home = () => {
   const { token } = useContext(AuthContext);
   const { isOffline, isDegraded, refresh } = useBackendHealth();
+  const { theme, toggleTheme } = useTheme();
+  const darkMode = theme === "dark";
   const [dashboard, setDashboard] = useState(EMPTY_DASHBOARD);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [darkMode, setDarkMode] = useState(() => window.localStorage.getItem("dashboard-theme") === "dark");
   const [commandOpen, setCommandOpen] = useState(false);
   const [widgetOrder, setWidgetOrder] = useState(["overview", "analytics", "ai", "transactions", "workflow"]);
   const [chartQuery, setChartQuery] = useState("");
   const [chartLoading, setChartLoading] = useState(false);
   const [chartData, setChartData] = useState(null);
   const [chartExplanation, setChartExplanation] = useState("");
-
-  useEffect(() => {
-    document.documentElement.classList.toggle("dark", darkMode);
-    window.localStorage.setItem("dashboard-theme", darkMode ? "dark" : "light");
-  }, [darkMode]);
 
   const loadDashboard = useCallback(async () => {
     if (!token) {
@@ -285,7 +282,7 @@ const Home = () => {
     { label: "Open transactions workspace", hint: "Ledger", run: () => { window.location.href = "/transactions"; } },
     { label: "Open import center", hint: "Upload", run: () => { window.location.href = "/transactions"; } },
     { label: "Generate report", hint: "AI", run: () => setChartQuery("Monthly income vs expenses") },
-    { label: darkMode ? "Switch to light mode" : "Switch to dark mode", hint: "Theme", run: () => setDarkMode(!darkMode) },
+    { label: darkMode ? "Switch to light mode" : "Switch to dark mode", hint: "Theme", run: () => toggleTheme() },
   ];
 
   const renderAiChart = () => {

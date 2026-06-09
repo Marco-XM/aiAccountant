@@ -40,7 +40,8 @@ const Register = () => {
         toast.success(data.message || "Registration successful");
         SetUserToken(data.token);
         localStorage.setItem("token", data.token);
-        navigate("/");
+        const decoded = JSON.parse(atob(data.token.split(".")[1]));
+        navigate(`/app/${decoded._id}/`);
       }
     } catch (e) {
       // Error is already handled by API client interceptor
@@ -89,7 +90,7 @@ const Register = () => {
               </svg>
             </div>
           </div>
-          <h2 className="text-4xl font-extrabold text-gray-900 mb-2">
+          <h2 className="text-4xl font-extrabold text-ink-2 mb-2">
             Create Account
           </h2>
           <p className="text-[color:var(--ui-ink-2)]">
@@ -99,13 +100,13 @@ const Register = () => {
         <div className="ui-card ui-card-strong p-8 space-y-6">
           <form onSubmit={handleSubmit(signup)} className="space-y-5">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-ink mb-2">
                 Full Name
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <svg
-                    className="h-5 w-5 text-gray-400"
+                    className="h-5 w-5 text-muted"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -147,13 +148,13 @@ const Register = () => {
               )}
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-ink mb-2">
                 Email Address
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <svg
-                    className="h-5 w-5 text-gray-400"
+                    className="h-5 w-5 text-muted"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -195,13 +196,13 @@ const Register = () => {
               )}
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-ink mb-2">
                 Password
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <svg
-                    className="h-5 w-5 text-gray-400"
+                    className="h-5 w-5 text-muted"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -243,13 +244,13 @@ const Register = () => {
               )}
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-ink mb-2">
                 Business Type
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <svg
-                    className="h-5 w-5 text-gray-400"
+                    className="h-5 w-5 text-muted"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"

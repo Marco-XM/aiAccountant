@@ -1,11 +1,12 @@
 const express = require("express");
 const router = express.Router();
 const auth = require("../middleware/auth.mw");
+const checkLimit = require("../middleware/checkLimit.mw");
 const controller = require("../controllers/aiChartsController");
 
 // Public/chart workspace endpoints (require auth)
 router.get("/workspace", auth, controller.getWorkspace);
-router.post("/generate", auth, controller.generate);
+router.post("/generate", auth, checkLimit("aiChartGenerations"), controller.generate);
 
 // Async job API
 router.post("/jobs", auth, controller.createJob);

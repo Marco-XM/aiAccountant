@@ -15,7 +15,7 @@ const getAuthToken = () => localStorage.getItem("token") || "";
 const API_ORIGIN = normalizeOrigin(
   import.meta.env.VITE_API_ORIGIN ||
     import.meta.env.VITE_API_URL ||
-    (import.meta.env.PROD ? "/_/backend" : "http://localhost:5000")
+    "http://localhost:5000",
 );
 
 const API_BASE_URL = normalizeUrl(
@@ -207,6 +207,12 @@ apiClient.interceptors.response.use(
       // Handle specific error codes
       switch (error.response.status) {
         case 503:
+          // featureUnavailable=true means the server is healthy but this feature requires
+          // MongoDB-backed accounts (e.g. chat sessions). Don't mark the whole backend offline.
+          if (error.response.data?.featureUnavailable) {
+            // Silently ignore — the caller handles this gracefully
+            break;
+          }
           setBackendHealth({
             status: "offline",
             lastCheckedAt: Date.now(),
@@ -233,7 +239,12 @@ apiClient.interceptors.response.use(
         case 403:
           if (!apiClient._lastToastTimes._403 || now - apiClient._lastToastTimes._403 > cooldownMs) {
             apiClient._lastToastTimes._403 = now;
-            toast.error("You do not have permission to perform this action.");
+            const errData = error.response.data;
+            if (errData?.code === "LIMIT_EXCEEDED") {
+              toast.error(errData.message || "You've reached your plan limit. Upgrade to continue.");
+            } else {
+              toast.error("You do not have permission to perform this action.");
+            }
           }
           break;
         case 404:
@@ -391,6 +402,15 @@ export const api = {
       apiClient.get(`/excel/expenses/stats?count=${count}`),
     getSalesStats: (count) =>
       apiClient.get(`/excel/sales/stats?count=${count}`),
+  },
+
+  // Developer API keys
+  developer: {
+    listScopes: () => apiClient.get("/developer/scopes"),
+    listKeys: () => apiClient.get("/developer/keys"),
+    createKey: (data) => apiClient.post("/developer/keys", data),
+    updateKey: (id, data) => apiClient.patch(`/developer/keys/${id}`, data),
+    revokeKey: (id) => apiClient.delete(`/developer/keys/${id}`),
   },
 };
 

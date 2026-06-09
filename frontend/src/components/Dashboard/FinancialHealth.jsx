@@ -15,9 +15,9 @@ import {
 } from "recharts";
 
 const MiniSpark = ({ label }) => (
-  <div className="rounded-md bg-slate-900/50 p-3">
-    <p className="text-xs text-slate-400">{label}</p>
-    <div className="mt-2 h-10 bg-gradient-to-r from-cyan-500/20 to-rose-500/10 rounded" />
+  <div className="rounded-md bg-surface-alt border border-theme p-3">
+    <p className="text-xs text-muted">{label}</p>
+    <div className="mt-2 h-10 bg-gradient-to-r from-[#3E92CC]/20 to-[#D8315B]/10 rounded" />
   </div>
 );
 
@@ -63,51 +63,51 @@ const FinancialHealth = () => {
       <Card title="Financial Health">
         {error && <ErrorBanner message={error} onRetry={fetch} />}
 
-        <p className="text-xs text-slate-400">Trends, forecasts and KPI comparisons</p>
+        <p className="text-xs text-muted">Trends, forecasts and KPI comparisons</p>
 
         <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
           <div className="lg:col-span-2 space-y-4">
             {loading ? (
               <div className="animate-pulse space-y-4">
-                <div className="h-10 rounded bg-slate-800/40" />
-                <div className="h-48 rounded bg-slate-800/30" />
+                <div className="h-10 rounded bg-skeleton" />
+                <div className="h-48 rounded bg-skeleton" />
               </div>
             ) : (
               <>
                 <MiniSpark label="Monthly Net" />
 
-                <div className="rounded-md bg-slate-900/40 p-4">
-                  <p className="text-sm text-slate-300">Income vs Expense (last 12 months)</p>
+                <div className="rounded-md bg-surface-alt border border-theme p-4">
+                  <p className="text-sm text-muted-2">Income vs Expense (last 12 months)</p>
                   <div className="mt-3 h-48 rounded">
                     {overview?.trends && overview.trends.length > 0 ? (
                       <ResponsiveContainer width="100%" height={190}>
                         <AreaChart data={overview.trends} margin={{ top: 6, right: 12, left: 0, bottom: 6 }}>
                           <defs>
                             <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.2} />
-                              <stop offset="95%" stopColor="#06b6d4" stopOpacity={0} />
+                              <stop offset="5%" stopColor="#3E92CC" stopOpacity={0.2} />
+                              <stop offset="95%" stopColor="#3E92CC" stopOpacity={0} />
                             </linearGradient>
                             <linearGradient id="colorExpense" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#fb7185" stopOpacity={0.18} />
-                              <stop offset="95%" stopColor="#fb7185" stopOpacity={0} />
+                              <stop offset="5%" stopColor="#D8315B" stopOpacity={0.18} />
+                              <stop offset="95%" stopColor="#D8315B" stopOpacity={0} />
                             </linearGradient>
                           </defs>
-                          <CartesianGrid stroke="rgba(255,255,255,0.03)" vertical={false} />
-                          <XAxis dataKey="date" tick={{ fill: "#94a3b8", fontSize: 12 }} />
-                          <YAxis tickFormatter={(v) => (typeof v === "number" ? `$${(v >= 1000 ? v / 1000 + 'k' : v)}` : v)} tick={{ fill: "#94a3b8", fontSize: 12 }} />
+                          <CartesianGrid stroke="rgba(10,36,99,0.06)" vertical={false} />
+                          <XAxis dataKey="date" tick={{ fill: "var(--ui-muted)", fontSize: 12 }} />
+                          <YAxis tickFormatter={(v) => (typeof v === "number" ? `$${(v >= 1000 ? v / 1000 + 'k' : v)}` : v)} tick={{ fill: "var(--ui-muted)", fontSize: 12 }} />
                           <Tooltip
-                            contentStyle={{ background: "#0f1724", border: "1px solid rgba(255,255,255,0.04)", color: "#fff" }}
+                            contentStyle={{ background: "var(--ui-surface)", border: "1px solid var(--ui-border)", color: "var(--ui-ink)", borderRadius: 12 }}
                             formatter={(value, name) => {
                               return [typeof value === "number" ? `$${value.toLocaleString()}` : value, name];
                             }}
                           />
-                          <Legend verticalAlign="top" align="right" wrapperStyle={{ color: "#94a3b8", fontSize: 12 }} />
-                          <Area type="monotone" dataKey="income" stroke="#06b6d4" fillOpacity={1} fill="url(#colorIncome)" strokeWidth={2} />
-                          <Area type="monotone" dataKey="expense" stroke="#fb7185" fillOpacity={1} fill="url(#colorExpense)" strokeWidth={2} />
+                          <Legend verticalAlign="top" align="right" wrapperStyle={{ color: "var(--ui-muted)", fontSize: 12 }} />
+                          <Area type="monotone" dataKey="income" stroke="#3E92CC" fillOpacity={1} fill="url(#colorIncome)" strokeWidth={2} />
+                          <Area type="monotone" dataKey="expense" stroke="#D8315B" fillOpacity={1} fill="url(#colorExpense)" strokeWidth={2} />
                         </AreaChart>
                       </ResponsiveContainer>
                     ) : (
-                      <div className="h-full w-full bg-gradient-to-b from-slate-800 to-slate-900 rounded" />
+                      <div className="h-full w-full bg-surface-alt rounded" />
                     )}
                   </div>
                 </div>
@@ -118,19 +118,19 @@ const FinancialHealth = () => {
           <aside className="space-y-4">
             {loading ? (
               <div className="animate-pulse space-y-3">
-                <div className="h-12 rounded bg-slate-800/40" />
-                <div className="h-12 rounded bg-slate-800/40" />
+                <div className="h-12 rounded bg-skeleton" />
+                <div className="h-12 rounded bg-skeleton" />
               </div>
             ) : (
               <>
-                <div className="rounded-md bg-slate-900/40 p-4">
-                  <p className="text-xs text-slate-300">KPI Comparison</p>
-                  <div className="mt-3 text-white text-2xl font-semibold">{overview?.kpiComparison ?? "+--%"}</div>
+                <div className="rounded-md bg-surface-alt border border-theme p-4">
+                  <p className="text-xs text-muted">KPI Comparison</p>
+                  <div className="mt-3 text-ink-2 text-2xl font-semibold">{overview?.kpiComparison ?? "+--%"}</div>
                 </div>
 
-                <div className="rounded-md bg-slate-900/40 p-4">
-                  <p className="text-xs text-slate-300">Forecast</p>
-                  <div className="mt-3 text-sm text-slate-300">{overview?.forecast?.summary ?? "N/A"}</div>
+                <div className="rounded-md bg-surface-alt border border-theme p-4">
+                  <p className="text-xs text-muted">Forecast</p>
+                  <div className="mt-3 text-sm text-muted-2">{overview?.forecast?.summary ?? "N/A"}</div>
                 </div>
               </>
             )}

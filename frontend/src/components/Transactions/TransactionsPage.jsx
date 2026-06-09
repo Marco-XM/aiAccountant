@@ -18,6 +18,7 @@ import {
   suggestCategory,
 } from "./transactionsUtils";
 import SkeletonLoader from "../Shared/SkeletonLoader";
+import { useTheme } from "../../Context/ThemeContext";
 
 const PAGE_SIZE = 250;
 const ROW_HEIGHT = 66;
@@ -785,7 +786,8 @@ const CommandPalette = ({ open, onClose, actions }) => {
 const TransactionsPage = () => {
   const backendStatus = useBackendStatus();
   const backendUnavailable = ["offline", "degraded"].includes(backendStatus.status);
-  const [darkMode, setDarkMode] = useStoredState("transactions:theme", false);
+  const { theme, toggleTheme } = useTheme();
+  const darkMode = theme === "dark";
   const [filters, setFilters] = useStoredState("transactions:filters:v2", DEFAULT_FILTERS);
   const [visibleColumns, setVisibleColumns] = useStoredState("transactions:columns:v2", DEFAULT_COLUMNS);
   const [savedViews, setSavedViews] = useStoredState("transactions:savedViews:v2", []);
@@ -843,10 +845,9 @@ const TransactionsPage = () => {
   const insights = useMemo(() => deriveInsights(transactions), [transactions]);
 
   useEffect(() => {
-    document.documentElement.classList.toggle("dark", Boolean(darkMode));
     document.body.classList.add("overflow-x-hidden");
     return () => document.body.classList.remove("overflow-x-hidden");
-  }, [darkMode]);
+  }, []);
 
   const addImportEvent = useCallback((label) => {
     setImportEvents((current) => [
@@ -1242,11 +1243,11 @@ const TransactionsPage = () => {
     { label: "Flag selected", hint: "Review", run: () => bulkStatus("flagged") },
     { label: "Export current view", hint: "CSV", run: exportRows },
     { label: "Save current view", hint: "View", run: saveView },
-    { label: darkMode ? "Switch to light mode" : "Switch to dark mode", hint: "Theme", run: () => setDarkMode(!darkMode) },
+    { label: darkMode ? "Switch to light mode" : "Switch to dark mode", hint: "Theme", run: toggleTheme },
   ];
 
   return (
-    <div className={classNames(darkMode ? "dark" : "", "min-h-full w-full max-w-full overflow-x-hidden bg-[#f6f8fb] text-slate-950 dark:bg-slate-950 dark:text-slate-100")}>
+    <div className="min-h-full w-full max-w-full overflow-x-hidden bg-[#f6f8fb] text-slate-950 dark:bg-slate-950 dark:text-slate-100">
       <div className="mx-auto flex w-full max-w-[1660px] flex-col gap-4 px-3 py-4 sm:px-5 lg:px-6">
         <header className="sticky top-0 z-30 rounded-2xl border border-slate-200 bg-white/92 p-3 shadow-[0_12px_34px_rgba(15,23,42,.08)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/92 sm:p-4">
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(360px,.85fr)] xl:items-center">
@@ -1267,7 +1268,7 @@ const TransactionsPage = () => {
                 <Button onClick={() => setShowFilters((value) => !value)}><Icon name="filter" /> Filters</Button>
                 <Button onClick={() => setShowColumns((value) => !value)}><Icon name="columns" /> Columns</Button>
                 <Button onClick={exportRows}><Icon name="export" /> Export</Button>
-                <Button onClick={() => setDarkMode(!darkMode)}>{darkMode ? "Light" : "Dark"}</Button>
+                <Button onClick={toggleTheme}>{darkMode ? "Light" : "Dark"}</Button>
                 <Button variant="primary" onClick={() => loadTransactions({ reset: true })}>Refresh</Button>
               </div>
             </div>

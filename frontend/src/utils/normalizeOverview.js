@@ -11,7 +11,8 @@ export function normalizeOverview(raw = {}) {
 
   const pickString = (...keys) => {
     for (const k of keys) {
-      if (raw[k] != null) return String(raw[k]);
+      const v = raw[k];
+      if (v != null && typeof v !== 'object') return String(v);
     }
     return undefined;
   };
@@ -24,14 +25,45 @@ export function normalizeOverview(raw = {}) {
     return `$${n.toLocaleString()}`;
   };
 
-  const revenue = pickNumber('revenue', 'totalRevenue', 'revenue_t12', 'ttm_revenue');
-  const netProfit = pickNumber('netProfit', 'net', 'profit', 'net_income');
-  const cashFlow = pickNumber('cashFlow', 'cash', 'cash_flow', 'liquidity');
-  const growthPct = pickNumber('growthPct', 'growthPercent', 'growth', 'growth');
+  const _summary = (raw.summary && typeof raw.summary === 'object') ? raw.summary : {};
+  const revenue = pickNumber('revenue', 'totalRevenue', 'revenue_t12', 'ttm_revenue') ?? _summary.revenue;
+  const netProfit = pickNumber('netProfit', 'net', 'profit', 'net_income') ?? _summary.netProfit;
+  const cashFlow = pickNumber('cashFlow', 'cash', 'cash_flow', 'liquidity') ?? _summary.cashFlow ?? _summary.bankBalance;
+  const expenses = pickNumber('expenses', 'totalExpenses', 'costs') ?? _summary.expenses;
+  const growthPct = pickNumber('growthPct', 'growthPercent', 'growth') ?? _summary.monthlyGrowth;
 
-  const aiSummary = pickString('aiSummary', 'ai', 'insights') || (raw.ai && raw.ai.summary) || undefined;
+  const aiSummary = pickString('aiSummary')
+    || (raw.ai && typeof raw.ai === 'object' && typeof raw.ai.summary === 'string' ? raw.ai.summary : null)
+    || (Array.isArray(raw.insights) && raw.insights.length > 0
+        ? (raw.insights[0].text || raw.insights[0].title || null)
+        : null)
+    || undefined;
 
-  const alerts = raw.alerts || raw.risks || raw.warnings || undefined;
+  const _normalizeAlerts = (arr) => Array.isArray(arr) && arr.length
+    ? arr.map((a, i) => ({
+        id: a.id ?? i + 1,
+        title: a.title || a.message || 'Alert',
+        detail: a.detail || a.text || a.message || '',
+        tone: a.tone || (a.priority === 'High' ? 'rose' : 'violet'),
+      }))
+    : null;
+  const alerts = _normalizeAlerts(raw.alerts || raw.risks || raw.warnings)
+    || (Array.isArray(raw.workflow?.reminders) && raw.workflow.reminders.length
+        ? raw.workflow.reminders.map((r, i) => ({
+            id: i + 1,
+            title: r.title,
+            detail: `Due: ${r.due} — ${r.priority}`,
+            tone: r.priority === 'High' ? 'rose' : 'violet',
+          }))
+        : undefined);
+
+  const insights = Array.isArray(raw.insights)
+    ? raw.insights.map((item, i) => ({
+        id: item.id ?? i + 1,
+        title: item.title || 'Insight',
+        body: item.text || item.body || item.message || '',
+      }))
+    : undefined;
 
   // Trends/forecast passthrough - normalize individual points to { date, income, expense, profit }
   const rawTrends = raw.trends || raw.timeseries || raw.series || [];
@@ -65,6 +97,9 @@ export function normalizeOverview(raw = {}) {
     .filter(Boolean);
   const forecast = raw.forecast || raw.prediction || {};
 
+  const _growth = growthPct != null ? Number(growthPct) : null;
+  const growthFormatted = _growth != null ? `${_growth >= 0 ? '+' : ''}${_growth.toFixed(1)}%` : undefined;
+
   return {
     revenue: formatCurrency(revenue) || raw.revenueFormatted || undefined,
     revenueRaw: revenue,
@@ -72,9 +107,13 @@ export function normalizeOverview(raw = {}) {
     netProfitRaw: netProfit,
     cashFlow: formatCurrency(cashFlow) || raw.cashFormatted || undefined,
     cashFlowRaw: cashFlow,
-    growthPct: growthPct != null ? `${growthPct}%` : undefined,
-    growthRaw: growthPct,
+    expenses: formatCurrency(expenses) || undefined,
+    expensesRaw: expenses,
+    growthPct: growthFormatted,
+    growthRaw: _growth,
+    kpiComparison: growthFormatted ?? '--',
     aiSummary,
+    insights,
     alerts,
     trends,
     forecast,

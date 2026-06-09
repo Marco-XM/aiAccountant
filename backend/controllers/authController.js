@@ -34,15 +34,29 @@ if (isDev && !process.env.JWT_SECRET) {
 const isDatabaseReady = () => mongoose.connection.readyState === 1;
 const useLocalAuthStore = () => isDev || !isDatabaseReady();
 
-const signToken = (user) =>
-  jwt.sign({ _id: user._id || user.id, email: user.email }, JWT_SECRET, {
-    expiresIn: JWT_CONFIG.EXPIRES_IN,
-  });
+// Admin emails from env: ADMIN_EMAILS=email1@x.com,email2@x.com
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || "")
+  .split(",")
+  .map((e) => e.trim().toLowerCase())
+  .filter(Boolean);
+
+const isAdminEmail = (email) =>
+  ADMIN_EMAILS.includes(String(email || "").trim().toLowerCase());
+
+const signToken = (user) => {
+  const email = user.email || "";
+  return jwt.sign(
+    { _id: user._id || user.id, email, isAdmin: isAdminEmail(email) },
+    JWT_SECRET,
+    { expiresIn: JWT_CONFIG.EXPIRES_IN }
+  );
+};
 
 const publicUser = (user) => ({
   id: user._id || user.id,
   name: user.name,
   email: user.email,
+  isAdmin: isAdminEmail(user.email),
 });
 
 const register = async (req, res) => {
