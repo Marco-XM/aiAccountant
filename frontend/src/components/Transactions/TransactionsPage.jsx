@@ -785,7 +785,7 @@ const CommandPalette = ({ open, onClose, actions }) => {
 
 const TransactionsPage = () => {
   const backendStatus = useBackendStatus();
-  const backendUnavailable = ["offline", "degraded"].includes(backendStatus.status);
+  const backendUnavailable = backendStatus.status === "offline";
   const { theme, toggleTheme } = useTheme();
   const darkMode = theme === "dark";
   const [filters, setFilters] = useStoredState("transactions:filters:v2", DEFAULT_FILTERS);

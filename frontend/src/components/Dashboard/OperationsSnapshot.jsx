@@ -10,7 +10,7 @@ const OperationsSnapshot = () => {
   const [stats, setStats] = useState({});
   const [error, setError] = useState(null);
   const backendStatus = useBackendStatus();
-  const backendUnavailable = ["offline", "degraded"].includes(backendStatus.status);
+  const backendUnavailable = backendStatus.status === "offline";
 
   const fetch = useCallback(async () => {
     if (backendUnavailable) {
