@@ -69,7 +69,10 @@ const refreshBackendHealth = async () => {
     const healthStatus = response.data?.status || "unknown";
     const databaseStatus = response.data?.database?.status || "unknown";
 
-    if (healthStatus === "ok" && databaseStatus === "connected") {
+    if (healthStatus === "ok") {
+      // Server is healthy — either MongoDB is connected or the project is
+      // intentionally running in local-store mode (missing-config). Either way,
+      // the backend is fully operational and API calls should go through.
       setBackendHealth({
         status: "online",
         lastCheckedAt: Date.now(),

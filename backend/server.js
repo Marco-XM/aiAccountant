@@ -156,7 +156,10 @@ app.get("/", (req, res) => {
 app.get("/health", (req, res) => {
   const mongoHealth = getMongoHealth();
   const redisHealth = getRedisHealth();
-  const healthy = mongoHealth.status === "connected";
+  // "missing-config" means the project is intentionally running in local-store
+  // mode (no MONGODB_URI set). That is a valid operational state, not an error.
+  const healthy =
+    mongoHealth.status === "connected" || mongoHealth.status === "missing-config";
 
   // Always return 200 so the frontend does not mark the backend as fully
   // offline during a cold start. The frontend reads the body to determine
