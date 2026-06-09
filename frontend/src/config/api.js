@@ -59,7 +59,7 @@ const isBackendShortCircuited = () =>
 
 const healthClient = axios.create({
   baseURL: API_ORIGIN,
-  timeout: 4000,
+  timeout: 12000, // 12s — Vercel cold starts can take 5-10s
   headers: { "Content-Type": "application/json" },
 });
 
@@ -90,13 +90,19 @@ const refreshBackendHealth = async () => {
       reason: healthStatus,
     });
   } catch (error) {
+    // Timeouts and no-response errors (cold starts, transient network blips) are
+    // "degraded", not "offline". Only a confirmed server error response marks offline.
+    // This prevents Vercel cold starts from hard-blocking all API calls.
+    const isTimeout = error.code === "ECONNABORTED" || String(error.message).toLowerCase().includes("timeout");
+    const hasServerResponse = !!error.response;
+    const newStatus = hasServerResponse ? "offline" : "degraded";
     setBackendHealth({
-      status: "offline",
+      status: newStatus,
       lastCheckedAt: Date.now(),
-      unavailableUntil: Date.now() + 10 * 1000,
+      unavailableUntil: Date.now() + (newStatus === "offline" ? 10 : 5) * 1000,
       lastError: error.response?.data?.message || error.message || "Backend unavailable",
       lastStatusCode: error.response?.status || null,
-      reason: error.response?.status === 503 ? "degraded" : "offline",
+      reason: isTimeout ? "timeout" : (hasServerResponse ? "server-error" : "no-response"),
     });
   }
 };

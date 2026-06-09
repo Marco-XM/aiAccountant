@@ -21,7 +21,10 @@ const DashboardLayout = () => {
   const { user } = useContext(AuthContext);
   const [overview, setOverview] = useState(null);
   const backendStatus = useBackendStatus();
-  const backendUnavailable = ["offline", "degraded"].includes(backendStatus.status);
+  // Hard-offline means no connection at all; degraded means backend is up but
+  // DB is still warming (cold start). Only skip the fetch on hard offline.
+  const backendUnavailable = backendStatus.status === "offline";
+  const backendDegraded = backendStatus.status === "degraded";
 
   const fetchOverview = useCallback(async () => {
     if (backendUnavailable) return;
@@ -73,6 +76,19 @@ const DashboardLayout = () => {
               >
                 <span className="inline-block h-2 w-2 rounded-full bg-red-400" />
                 Backend offline — data unavailable
+              </div>
+            )}
+            {!backendUnavailable && backendDegraded && (
+              <div
+                className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium"
+                style={{
+                  background: "rgba(234,179,8,0.15)",
+                  border: "1px solid rgba(234,179,8,0.35)",
+                  color: "#fde68a",
+                }}
+              >
+                <span className="inline-block h-2 w-2 rounded-full bg-yellow-400 animate-pulse" />
+                Connecting to server…
               </div>
             )}
           </div>
