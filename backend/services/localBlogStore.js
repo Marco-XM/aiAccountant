@@ -2,7 +2,7 @@ const fs = require("fs/promises");
 const path = require("path");
 const crypto = require("crypto");
 
-const STORE_DIR = path.join(__dirname, "..", "uploads", "blog");
+const STORE_DIR = process.env.VERCEL === "1" ? require("path").join("/tmp", "blog") : path.join(__dirname, "..", "uploads", "blog");
 const STORE_FILE = path.join(STORE_DIR, "store.json");
 
 const ensureStore = async () => {

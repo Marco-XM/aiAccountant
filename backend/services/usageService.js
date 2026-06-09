@@ -9,7 +9,7 @@
 const fs = require("fs/promises");
 const path = require("path");
 
-const STORE_DIR  = path.join(__dirname, "..", "uploads", "usage");
+const STORE_DIR  = process.env.VERCEL === "1" ? require("path").join("/tmp", "usage") : path.join(__dirname, "..", "uploads", "usage");
 const STORE_FILE = path.join(STORE_DIR, "store.json");
 
 const FEATURES = [

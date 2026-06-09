@@ -8,7 +8,7 @@ const path = require("path");
 const crypto = require("crypto");
 const { SUBSCRIPTION_PLANS } = require("../config/constants");
 
-const STORE_DIR  = path.join(__dirname, "..", "uploads", "tiers");
+const STORE_DIR  = process.env.VERCEL === "1" ? require("path").join("/tmp", "tiers") : path.join(__dirname, "..", "uploads", "tiers");
 const STORE_FILE = path.join(STORE_DIR, "store.json");
 
 // ── seed from constants ──────────────────────────────────────────────────────

@@ -39,35 +39,27 @@ app.set("trust proxy", 1);
 const clientUrl = process.env.CLIENT_URL || process.env.CLIENT;
 
 const allowedOrigins = clientUrl
-  ? clientUrl
-      .split(",")
-      .map((o) => o.trim())
-      .filter(Boolean)
-  : null;
+  ? clientUrl.split(",").map((o) => o.trim()).filter(Boolean)
+  : [];
 
 const isLocalDevOrigin = (origin) =>
   /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
 
+const isVercelOrigin = (origin) =>
+  /^https:\/\/[\w-]+\.vercel\.app$/.test(origin);
+
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow non-browser clients (curl/postman) with no Origin header
+      // Allow non-browser clients (curl/postman/mobile) with no Origin header
       if (!origin) return callback(null, true);
-
-      // If explicitly configured, only allow listed origins
-      if (allowedOrigins) {
-        if (allowedOrigins.includes(origin)) return callback(null, true);
-
-        // Dev convenience: if you're developing locally, allow any localhost port
-        // even when CLIENT/CLIENT_URL is set to a single localhost origin.
-        if (!isProduction && isLocalDevOrigin(origin))
-          return callback(null, true);
-
-        return callback(null, false);
-      }
-
-      // Dev default: allow any localhost port (Vite may choose 5174, 5175, ...)
-      return callback(null, isLocalDevOrigin(origin));
+      // Always allow localhost in any environment
+      if (isLocalDevOrigin(origin)) return callback(null, true);
+      // Always allow any *.vercel.app deployment (covers both projects)
+      if (isVercelOrigin(origin)) return callback(null, true);
+      // Allow explicitly configured origins (CLIENT_URL env var)
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      return callback(null, false);
     },
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     credentials: true,
