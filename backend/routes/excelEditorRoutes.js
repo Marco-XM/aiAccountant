@@ -8,8 +8,9 @@ const excelController = require('../controllers/excelEditorController');
 const router = express.Router();
 
 // Configure multer for file uploads
+const UPLOAD_DIR = process.env.VERCEL === "1" ? "/tmp" : "uploads/excel/";
 const upload = multer({
-  dest: 'uploads/excel/',
+  dest: UPLOAD_DIR,
   limits: {
     fileSize: 50 * 1024 * 1024, // 50MB
   },

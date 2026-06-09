@@ -77,7 +77,7 @@ exports.uploadFile = async (req, res) => {
     // const s3Url = await fileService.uploadFile(filePath, s3Key);
 
     // For now, save locally
-    const uploadDir = path.join(__dirname, '../uploads/excel');
+    const uploadDir = process.env.VERCEL === '1' ? '/tmp' : path.join(__dirname, '../uploads/excel');
     await fs.mkdir(uploadDir, { recursive: true });
     const savedPath = path.join(uploadDir, `${Date.now()}-${originalname}`);
     await fs.rename(filePath, savedPath);
@@ -283,7 +283,7 @@ exports.applyChanges = async (req, res) => {
     const buffer = await excelService.generateExcelFile(sheets);
 
     // Save file (TODO: to S3)
-    const uploadDir = path.join(__dirname, '../uploads/excel');
+    const uploadDir = process.env.VERCEL === '1' ? '/tmp' : path.join(__dirname, '../uploads/excel');
     await fs.mkdir(uploadDir, { recursive: true });
     const newFilePath = path.join(uploadDir, `${Date.now()}-${file.fileName}`);
     await fs.writeFile(newFilePath, buffer);
@@ -500,7 +500,7 @@ exports.restoreVersion = async (req, res) => {
     if (!version) return res.status(404).json({ error: 'Version not found' });
 
     // Copy version file to new location
-    const uploadDir = path.join(__dirname, '../uploads/excel');
+    const uploadDir = process.env.VERCEL === '1' ? '/tmp' : path.join(__dirname, '../uploads/excel');
     const newFilePath = path.join(uploadDir, `${Date.now()}-${file.fileName}`);
     await fs.copyFile(version.s3Key, newFilePath);
 
