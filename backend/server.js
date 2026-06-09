@@ -158,7 +158,11 @@ app.get("/health", (req, res) => {
   const redisHealth = getRedisHealth();
   const healthy = mongoHealth.status === "connected";
 
-  res.status(healthy ? 200 : 503).json({
+  // Always return 200 so the frontend does not mark the backend as fully
+  // offline during a cold start. The frontend reads the body to determine
+  // "online" vs "degraded" — a 503 forces it into hard-offline mode which
+  // blocks every subsequent API call.
+  res.status(200).json({
     status: healthy ? "ok" : mongoHealth.status,
     environment: process.env.NODE_ENV || "development",
     uptimeSeconds: Math.round(process.uptime()),
