@@ -272,7 +272,10 @@ const genAI = new GoogleGenerativeAI(
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadDir = path.join(__dirname, "../uploads");
+    // Vercel's filesystem is read-only except for /tmp
+    const uploadDir = process.env.VERCEL === '1'
+      ? '/tmp'
+      : path.join(__dirname, '../uploads');
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }

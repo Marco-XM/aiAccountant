@@ -429,7 +429,8 @@ const generateExcelWithAI = async (req, res) => {
 
         // Generate Excel file
         const fileName = `excel_${Date.now()}.xlsx`;
-        const uploadsDir = path.join(__dirname, '../uploads');
+        // Vercel's filesystem is read-only except for /tmp
+        const uploadsDir = process.env.VERCEL === '1' ? '/tmp' : path.join(__dirname, '../uploads');
         
         // Create uploads directory if it doesn't exist
         if (!fs.existsSync(uploadsDir)) {
@@ -464,7 +465,8 @@ const generateExcelWithAI = async (req, res) => {
 const downloadExcel = async (req, res) => {
     try {
         const { fileName } = req.params;
-        const filePath = path.join(__dirname, '../uploads', fileName);
+        const uploadsDir = process.env.VERCEL === '1' ? '/tmp' : path.join(__dirname, '../uploads');
+        const filePath = path.join(uploadsDir, fileName);
 
         // Check if file exists
         if (!fs.existsSync(filePath)) {

@@ -228,6 +228,10 @@ const bootstrap = async () => {
   }
 };
 
-bootstrap();
+// In Vercel serverless mode the HTTP listener is managed by Vercel.
+// api/index.js sets VERCEL=1 and calls connectMongoDatabase() separately.
+if (process.env.VERCEL !== "1") {
+  bootstrap();
+}
 
 module.exports = app;
