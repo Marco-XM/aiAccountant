@@ -446,6 +446,10 @@ const buildTransactionFromChunkRow = (row, userId, job) => {
 
   const normalizedStatus = normalizeStatus(getValue(["status"])) || "pending";
 
+  const VALID_PAYMENT_METHODS = ["cash", "credit_card", "debit_card", "bank_transfer", "check", "other"];
+  const rawPaymentMethod = String(getValue(["payment method", "paymentmethod", "method"]) || "").trim().toLowerCase();
+  const normalizedPaymentMethod = VALID_PAYMENT_METHODS.includes(rawPaymentMethod) ? rawPaymentMethod : undefined;
+
   return {
     user: userId,
     userId,
@@ -460,7 +464,7 @@ const buildTransactionFromChunkRow = (row, userId, job) => {
     notes: String(getValue(["notes"]) || ""),
     reference: String(getValue(["reference", "ref", "id"]) || ""),
     account: String(getValue(["account"]) || ""),
-    paymentMethod: String(getValue(["payment method", "paymentmethod", "method"]) || ""),
+    ...(normalizedPaymentMethod ? { paymentMethod: normalizedPaymentMethod } : {}),
     source: job?.fileName || "import-job",
     importJobId: job?.id,
     importSheet: row.__sheetName ? String(row.__sheetName) : "",
