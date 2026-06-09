@@ -49,10 +49,17 @@ require("dotenv").config({ path: path.join(__dirname, "../.env") });
 
 const { connectMongoDatabase } = require("../services/mongoBootstrap");
 
-// Kick off DB connection once per cold start (non-blocking).
-// Requests will degrade gracefully if MongoDB is still warming up.
-connectMongoDatabase().catch((err) =>
-  console.error("[vercel] MongoDB connection error:", err.message)
-);
+// Start the connection once per cold start and keep the promise.
+// The exported handler awaits this promise on every request — on the
+// first (cold) request it blocks until Atlas responds; on warm requests
+// the promise is already resolved so it costs ~0ms.
+const dbReady = connectMongoDatabase().catch((err) => {
+  console.error("[vercel] MongoDB connection error:", err.message);
+});
 
-module.exports = require("../server");
+const app = require("../server");
+
+module.exports = async (req, res) => {
+  await dbReady;
+  return app(req, res);
+};
