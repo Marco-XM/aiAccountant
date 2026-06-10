@@ -3,7 +3,7 @@ const Tax = require("../models/Tax");
 const Transaction = require("../models/Transaction");
 const localTaxStore = require("../services/localTaxStore");
 const localTransactionStore = require("../services/localTransactionStore");
-const { calculateTaxes } = require("../services/taxService");
+const { calculateTaxes, loadUserTaxes } = require("../services/taxService");
 const { isMongoObjectId } = require("../services/userIdentity");
 
 const dbReady = () => mongoose.connection.readyState === 1;
@@ -35,13 +35,8 @@ const toClient = (t) => ({
   active: t.active !== false,
 });
 
-const loadTaxes = async (userId) => {
-  if (useLocal(userId)) {
-    return (await localTaxStore.list(userId)).map(toClient);
-  }
-  const docs = await Tax.find({ userId: String(userId) }).sort({ order: 1 }).lean();
-  return docs.map(toClient);
-};
+// Shared with the dashboard, chatbot, charts and transaction list.
+const loadTaxes = loadUserTaxes;
 
 /* ── CRUD ─────────────────────────────────────────────────────────────── */
 const listTaxes = async (req, res) => {

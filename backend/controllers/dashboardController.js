@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const Transaction = require("../models/Transaction");
 const localTransactionStore = require("../services/localTransactionStore");
 const { isMongoObjectId } = require("../services/userIdentity");
+const { loadUserTaxes, summarizeTransactionTaxes, taxForTransaction } = require("../services/taxService");
 
 const isDatabaseReady = () => mongoose.connection.readyState === 1;
 const useLocalTransactionStore = (userId) => !isDatabaseReady() || !isMongoObjectId(userId);
@@ -20,7 +21,7 @@ const monthKey = (value) => {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 };
 
-const calculateDashboard = (transactions = []) => {
+const calculateDashboard = (transactions = [], taxes = []) => {
   const rows = transactions.map((transaction) => ({
     ...transaction,
     type: normalizeType(transaction.type),
@@ -63,7 +64,16 @@ const calculateDashboard = (transactions = []) => {
   const growth = previousRevenue > 0 ? ((currentRevenue - previousRevenue) / previousRevenue) * 100 : currentRevenue > 0 ? 100 : 0;
   const burnRate = currentExpenses || expenses / Math.max(1, new Set(rows.map((row) => monthKey(row.date))).size);
   const runway = burnRate > 0 && netProfit > 0 ? netProfit / burnRate : 0;
-  const taxEstimate = Math.max(0, currentProfit * 0.22);
+
+  // Tax liability comes from the user's own tax rules (Taxes page), computed
+  // per transaction. No rules defined → $0 (no synthetic estimate).
+  const taxBreakdown = summarizeTransactionTaxes(rows, taxes);
+  const currentTaxBreakdown = summarizeTransactionTaxes(currentRows, taxes);
+  const taxLiability = taxBreakdown.totalTax;
+  const currentTax = currentTaxBreakdown.totalTax;
+  // Kept as `taxEstimate` for backward-compatible consumers, but it is now the
+  // real total tax from the user's rules rather than a flat-percentage guess.
+  const taxEstimate = taxLiability;
   const pendingCount = rows.filter((row) => ["pending", "needs_review"].includes(row.status)).length;
   const reconciliationCount = rows.filter((row) => ["pending", "needs_review", "flagged"].includes(row.status)).length;
 
@@ -135,7 +145,8 @@ const calculateDashboard = (transactions = []) => {
   const topVendors = Array.from(vendorMap.values()).sort((a, b) => b.amount - a.amount).slice(0, 8);
   const recentTransactions = [...rows]
     .sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt))
-    .slice(0, 8);
+    .slice(0, 8)
+    .map((row) => ({ ...row, taxAmount: taxForTransaction(row.amount, row.type, taxes).taxAmount }));
 
   const softwareCategory = topCategories.find((entry) => /software|hosting|subscription|cloud/i.test(entry.category));
   const insights = [
@@ -155,9 +166,12 @@ const calculateDashboard = (transactions = []) => {
       text: duplicateCount ? `${duplicateCount} potential duplicate transactions need review.` : "No duplicate pattern is visible in the current ledger.",
     },
     {
-      type: "info",
-      title: "Tax reserve",
-      text: `Set aside about ${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(taxEstimate)} based on current-month profit.`,
+      type: taxBreakdown.taxCount === 0 ? "info" : taxLiability > 0 ? "warning" : "info",
+      title: "Tax liability",
+      text:
+        taxBreakdown.taxCount === 0
+          ? "No tax rules defined yet — add them on the Taxes page to see your tax liability here."
+          : `Your tax rules total ${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(taxLiability)} (${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(currentTax)} this month).`,
     },
   ];
 
@@ -205,6 +219,11 @@ const calculateDashboard = (transactions = []) => {
       burnRate,
       runway,
       taxEstimate,
+      taxLiability,
+      currentTax,
+      taxOnIncome: taxBreakdown.incomeTax,
+      taxOnExpense: taxBreakdown.expenseTax,
+      taxCount: taxBreakdown.taxCount,
       profitMargin: margin,
       pendingCount,
       reconciliationCount,
@@ -277,7 +296,8 @@ const getDashboardOverview = async (req, res) => {
         .lean();
     }
 
-    res.json(calculateDashboard(transactions));
+    const taxes = await loadUserTaxes(userId);
+    res.json(calculateDashboard(transactions, taxes));
   } catch (error) {
     console.error("Error building dashboard overview:", error);
     res.status(500).json({ error: "Failed to load dashboard overview", message: error.message });

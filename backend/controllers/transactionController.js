@@ -11,6 +11,11 @@ const Transaction = require("../models/Transaction");
 const localTransactionStore = require("../services/localTransactionStore");
 const usageService = require("../services/usageService");
 const { isMongoObjectId } = require("../services/userIdentity");
+const {
+  loadUserTaxes,
+  taxForTransaction,
+  calculateTaxes,
+} = require("../services/taxService");
 
 const normalizeTransactionType = (value) => {
   if (value === undefined || value === null) return undefined;
@@ -2115,8 +2120,12 @@ const getTransactions = async (req, res) => {
         direction,
       });
 
+      const taxes = await loadUserTaxes(userId);
       return res.json({
-        transactions: localResult.transactions,
+        transactions: (localResult.transactions || []).map((t) => {
+          const { taxAmount, totalWithTax } = taxForTransaction(t.amount, t.type, taxes);
+          return { ...t, taxAmount, totalWithTax };
+        }),
         totalPages: localResult.totalPages,
         currentPage: localResult.currentPage,
         total: localResult.total,
@@ -2200,12 +2209,17 @@ const getTransactions = async (req, res) => {
       console.log("  Transaction types in result:", typeCounts);
     }
 
+    const taxes = await loadUserTaxes(userId);
     res.json({
       transactions: transactions.map((t) => {
         const obj = serializeTransactionDocument(t);
         // Ensure type and status are normalized
         obj.type = normalizeTransactionType(obj.type) || obj.type;
         obj.status = normalizeStatus(obj.status) || obj.status;
+        // Tax owed on this row, from the user's saved rules (computed on read).
+        const { taxAmount, totalWithTax } = taxForTransaction(obj.amount, obj.type, taxes);
+        obj.taxAmount = taxAmount;
+        obj.totalWithTax = totalWithTax;
         return obj;
       }),
       totalPages: Math.ceil(total / limitNum),
@@ -2404,6 +2418,21 @@ const deleteAllTransactions = async (req, res) => {
 };
 
 // Get transaction statistics
+// Adds tax figures to a stats `summary` from the user's rules, in place.
+// Uses the income/expense totals already computed by the aggregation so this
+// stays cheap (exact for percentage taxes; flat taxes are applied to the total).
+const attachTaxToSummary = (summary, taxes) => {
+  if (!summary) return summary;
+  const incomeTaxes = (taxes || []).filter((t) => ["all", "income"].includes(t.appliesTo || "all"));
+  const expenseTaxes = (taxes || []).filter((t) => ["all", "expense"].includes(t.appliesTo || "all"));
+  const incomeTax = calculateTaxes(summary.totalIncome || 0, incomeTaxes).totalTax;
+  const expenseTax = calculateTaxes(summary.totalExpenses || 0, expenseTaxes).totalTax;
+  summary.incomeTax = incomeTax;
+  summary.expenseTax = expenseTax;
+  summary.totalTax = Math.round((incomeTax + expenseTax) * 100) / 100;
+  return summary;
+};
+
 const getTransactionStats = async (req, res) => {
   try {
     // Check if user is authenticated
@@ -2464,6 +2493,7 @@ const getTransactionStats = async (req, res) => {
         dateFrom,
         dateTo,
       });
+      attachTaxToSummary(localStats.summary, await loadUserTaxes(userId));
       return res.json(localStats);
     }
 
@@ -2521,6 +2551,8 @@ const getTransactionStats = async (req, res) => {
       needsReviewCount: 0,
       reconciliationCount: 0,
     };
+
+    attachTaxToSummary(summaryDoc, await loadUserTaxes(userId));
 
     const result = {
       summary: summaryDoc,

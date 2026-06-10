@@ -32,9 +32,10 @@ const DEFAULT_FILTERS = {
   dateFrom: "",
   dateTo: "",
 };
-const DEFAULT_COLUMNS = ["date", "description", "amount", "category", "status", "vendor", "source"];
+const DEFAULT_COLUMNS = ["date", "description", "amount", "tax", "category", "status", "vendor", "source"];
+const ALL_COLUMNS = ["date", "description", "amount", "tax", "category", "status", "vendor", "source"];
 const EMPTY_STATS = {
-  summary: { totalTransactions: 0, totalIncome: 0, totalExpenses: 0, pendingCount: 0 },
+  summary: { totalTransactions: 0, totalIncome: 0, totalExpenses: 0, totalTax: 0, pendingCount: 0 },
   categoryBreakdown: [],
 };
 
@@ -378,6 +379,7 @@ const LedgerTable = ({
     show("date") ? "minmax(82px,.55fr)" : "",
     show("description") ? "minmax(180px,1.7fr)" : "",
     show("amount") ? "minmax(108px,.75fr)" : "",
+    show("tax") ? "minmax(96px,.6fr)" : "",
     show("category") ? "minmax(126px,.9fr)" : "",
     show("status") ? "minmax(118px,.75fr)" : "",
     show("vendor") ? "minmax(115px,.75fr)" : "",
@@ -432,6 +434,7 @@ const LedgerTable = ({
           {show("date") ? <HeaderButton column="date" label="Date" /> : null}
           {show("description") ? <HeaderButton column="desc" label="Description" /> : null}
           {show("amount") ? <HeaderButton column="amount" label="Amount" align="right" /> : null}
+          {show("tax") ? <HeaderButton column="tax" label="Tax" align="right" /> : null}
           {show("category") ? <HeaderButton column="category" label="Category" /> : null}
           {show("status") ? <HeaderButton column="status" label="Status" /> : null}
           {show("vendor") ? <HeaderButton column="vendor" label="Vendor" /> : null}
@@ -488,6 +491,11 @@ const LedgerTable = ({
                       {show("amount") ? (
                         <div className={classNames("flex min-w-0 items-center justify-end px-3 font-semibold", item.type === "income" ? "text-emerald-600" : "text-red-600")}>
                           {item.type === "income" ? "+" : "-"}{formatCurrency(Math.abs(item.amount || 0))}
+                        </div>
+                      ) : null}
+                      {show("tax") ? (
+                        <div className="flex min-w-0 items-center justify-end px-3 text-slate-600 dark:text-slate-300" title={item.taxAmount ? `Total incl. tax ${formatCurrency(item.totalWithTax || 0)}` : "No tax applies"}>
+                          {item.taxAmount ? formatCurrency(item.taxAmount) : <span className="text-slate-400">—</span>}
                         </div>
                       ) : null}
                       {show("category") ? (
@@ -603,6 +611,8 @@ const DetailsPanel = ({ transaction, insights, stats, onClose, onEdit, onDelete,
 
             <dl className="grid gap-3 text-sm">
               {[
+                ["Tax (from your rules)", formatCurrency(item.taxAmount || 0)],
+                ["Total incl. tax", formatCurrency(item.totalWithTax || Math.abs(item.amount || 0))],
                 ["Vendor", item.vendor || "None"],
                 ["Reference", item.reference || "None"],
                 ["Account", item.account || "Operating"],
@@ -794,7 +804,7 @@ const TransactionsPage = () => {
   const { theme, toggleTheme } = useTheme();
   const darkMode = theme === "dark";
   const [filters, setFilters] = useStoredState("transactions:filters:v2", DEFAULT_FILTERS);
-  const [visibleColumns, setVisibleColumns] = useStoredState("transactions:columns:v2", DEFAULT_COLUMNS);
+  const [visibleColumns, setVisibleColumns] = useStoredState("transactions:columns:v3", DEFAULT_COLUMNS);
   const [savedViews, setSavedViews] = useStoredState("transactions:savedViews:v2", []);
   const [transactions, setTransactions] = useState([]);
   const [stats, setStats] = useState(EMPTY_STATS);
@@ -1201,10 +1211,10 @@ const TransactionsPage = () => {
     const ids = new Set(selectedIds);
     const rows = sortedRows.filter((row) => !selectedIds.length || ids.has(normalizeTransaction(row)._id));
     const csv = [
-      ["Date", "Description", "Amount", "Category", "Type", "Status", "Vendor", "Reference", "Account"].join(","),
+      ["Date", "Description", "Amount", "Tax", "Total incl. tax", "Category", "Type", "Status", "Vendor", "Reference", "Account"].join(","),
       ...rows.map((row) => {
         const item = normalizeTransaction(row);
-        return [item.date, item.desc, item.amount, item.category, item.type, item.status, item.vendor, item.reference, item.account]
+        return [item.date, item.desc, item.amount, item.taxAmount, item.totalWithTax, item.category, item.type, item.status, item.vendor, item.reference, item.account]
           .map((value) => `"${String(value ?? "").replaceAll('"', '""')}"`)
           .join(",");
       }),
@@ -1280,10 +1290,11 @@ const TransactionsPage = () => {
           </div>
         </header>
 
-        <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-6">
           <MetricCard label="Transactions" value={formatCompactNumber(summary.totalTransactions || total)} meta="Current filtered ledger" />
           <MetricCard label="Income" value={formatCurrency(summary.totalIncome || 0)} meta="Recognized inflows" tone="green" />
           <MetricCard label="Expenses" value={formatCurrency(summary.totalExpenses || 0)} meta="Recognized outflows" tone="red" />
+          <MetricCard label="Tax" value={formatCurrency(summary.totalTax || 0)} meta="From your tax rules" tone="amber" />
           <MetricCard label="Net movement" value={formatCurrency(net)} meta="Income minus expenses" tone={net >= 0 ? "green" : "red"} />
           <MetricCard label="Review queue" value={formatCompactNumber(summary.pendingCount || 0)} meta="Pending or needs review" tone="amber" />
         </div>
@@ -1308,7 +1319,7 @@ const TransactionsPage = () => {
         {showColumns ? (
           <Panel className="p-3 sm:p-4">
             <div className="flex flex-wrap gap-2">
-              {["date", "description", "amount", "category", "status", "vendor", "source"].map((column) => (
+              {ALL_COLUMNS.map((column) => (
                 <Button key={column} variant={visibleColumns.includes(column) ? "primary" : "secondary"} onClick={() => toggleColumn(column)}>
                   {visibleColumns.includes(column) ? <Icon name="check" /> : null}
                   {column}

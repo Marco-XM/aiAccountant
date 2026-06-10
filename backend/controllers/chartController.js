@@ -4,6 +4,7 @@ const Groq = require("groq-sdk");
 const Transaction = require("../models/Transaction");
 const localTransactionStore = require("../services/localTransactionStore");
 const { isMongoObjectId } = require("../services/userIdentity");
+const { loadUserTaxes, taxForTransaction } = require("../services/taxService");
 
 const groq = process.env.GROQ_API_KEY
   ? new Groq({ apiKey: process.env.GROQ_API_KEY })
@@ -64,6 +65,15 @@ const fetchUserTransactions = async (userId) => {
     direction: "desc",
   });
   return (local.transactions || []).map(normalizeTransaction);
+};
+
+// Tag each row with the tax owed on it (from the user's saved rules) so chart
+// series and KPIs can aggregate tax the same way every other surface does.
+const annotateRowsWithTax = (rows, taxes = []) => {
+  for (const row of rows) {
+    row.tax = taxForTransaction(row.amount, row.type, taxes).taxAmount;
+  }
+  return rows;
 };
 
 const getDateFromRange = (range) => {
@@ -160,6 +170,7 @@ const buildMonthlySeries = (rows) => {
       expense: 0,
       transfer: 0,
       net: 0,
+      tax: 0,
       transactions: 0,
     };
 
@@ -173,6 +184,7 @@ const buildMonthlySeries = (rows) => {
       current.net -= row.amount;
     }
 
+    current.tax += row.tax || 0;
     current.transactions += 1;
     buckets.set(key, current);
   }
@@ -292,6 +304,7 @@ const buildKpis = (rows) => {
   const income = rows.filter((row) => row.type === "income").reduce((sum, row) => sum + row.amount, 0);
   const expense = rows.filter((row) => row.type === "expense").reduce((sum, row) => sum + row.amount, 0);
   const transfer = rows.filter((row) => row.type === "transfer").reduce((sum, row) => sum + row.amount, 0);
+  const tax = rows.reduce((sum, row) => sum + (row.tax || 0), 0);
   const net = income - expense;
 
   const pending = rows.filter((row) => ["pending", "needs_review", "flagged"].includes(row.status)).length;
@@ -302,6 +315,7 @@ const buildKpis = (rows) => {
     totalIncome: Number(income.toFixed(2)),
     totalExpense: Number(expense.toFixed(2)),
     totalTransfer: Number(transfer.toFixed(2)),
+    totalTax: Number(tax.toFixed(2)),
     netCashFlow: Number(net.toFixed(2)),
     averageTicket: Number(avgTicket.toFixed(2)),
     pendingReview: pending,
@@ -412,9 +426,11 @@ const parseIntent = (query = "") => {
   const askCategory = /category|categories/.test(text);
   const askIncome = /income|revenue|sales/.test(text);
   const askExpense = /expense|spend|cost/.test(text);
+  const askTax = /\b(tax|taxes|vat|gst|levy|duty)\b/.test(text);
 
   let chartType = "line";
-  if (askHeatmap) chartType = "heatmap";
+  if (askTax) chartType = "tax";
+  else if (askHeatmap) chartType = "heatmap";
   else if (askScatter) chartType = "scatter";
   else if (askCompare) chartType = "stackedBar";
   else if (askPie) chartType = askDonut ? "donut" : "pie";
@@ -439,6 +455,7 @@ const parseIntent = (query = "") => {
     chartType,
     focus,
     metric,
+    tax: askTax,
     forecast: askForecast,
     anomaly: askScatter || /anomaly|spike|suspicious/.test(text),
   };
@@ -451,6 +468,19 @@ const buildChartPayload = (rows, intent) => {
   const anomalies = detectAnomalies(rows);
   const heatmap = buildHeatmap(rows);
   const forecast = buildForecast(monthly);
+
+  if (intent.chartType === "tax" || intent.tax) {
+    return {
+      type: "bar",
+      title: "Tax by Month",
+      description: "Tax owed each month, computed from your saved tax rules.",
+      data: monthly,
+      xKey: "label",
+      yKeys: ["tax", "income", "expense"],
+      valueKey: "tax",
+      options: { stacked: false },
+    };
+  }
 
   if (intent.chartType === "heatmap") {
     return {
@@ -573,6 +603,10 @@ const buildInsights = (rows, kpis, chartPayload, anomalies) => {
     insights.push(`Expense-to-income ratio is ${ratio.toFixed(1)}%.`);
   }
 
+  if (kpis.totalTax > 0) {
+    insights.push(`Tax owed from your rules totals $${kpis.totalTax.toLocaleString()} across this view.`);
+  }
+
   const categorySeries = buildCategorySeries(rows, 1);
   if (categorySeries.length > 0) {
     insights.push(
@@ -644,7 +678,7 @@ const makeWorkspacePayload = async (rows) => {
       "Visualize top expense categories as a donut",
       "Forecast net cash flow for next quarter",
       "Compare vendors by revenue contribution",
-      "Show suspicious spending spikes",
+      "Show tax owed by month",
     ],
     suggestedCharts: [
       {
@@ -672,6 +706,20 @@ const makeWorkspacePayload = async (rows) => {
           valueKey: "expense",
           nameKey: "name",
           xKey: "name",
+        },
+      },
+      {
+        id: "tax-by-month",
+        title: "Tax by Month",
+        subtitle: "Tax owed from your saved tax rules",
+        type: "bar",
+        payload: {
+          type: "bar",
+          title: "Tax by Month",
+          data: monthly,
+          xKey: "label",
+          yKeys: ["tax"],
+          valueKey: "tax",
         },
       },
       {
@@ -761,6 +809,7 @@ const getWorkspace = async (req, res) => {
 
     const rows = await fetchUserTransactions(req.user._id);
     const filtered = applyFilters(rows, req.query || {});
+    annotateRowsWithTax(filtered, await loadUserTaxes(req.user._id));
     const payload = await makeWorkspacePayload(filtered);
 
     res.json(payload);
@@ -789,6 +838,8 @@ const generateChart = async (req, res) => {
         recommendations: ["Try removing filters or uploading transaction data."],
       });
     }
+
+    annotateRowsWithTax(filteredRows, await loadUserTaxes(req.user._id));
 
     const intent = parseIntent(query);
     const chart = buildChartPayload(filteredRows, intent);

@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const usageService = require('../services/usageService');
 const localTransactionStore = require('../services/localTransactionStore');
 const { isMongoObjectId } = require('../services/userIdentity');
+const { loadUserTaxes, summarizeTransactionTaxes } = require('../services/taxService');
 
 // Initialize Groq AI
 const groq = new Groq({
@@ -200,6 +201,54 @@ const queryTransactions = async (userId, query) => {
     return summary;
 };
 
+// Load every transaction for a user (used to compute per-transaction tax rollups).
+const loadAllTransactions = async (userId) => {
+    if (!isMongoObjectId(userId)) {
+        const { transactions } = await localTransactionStore.listTransactions({
+            userId: String(userId),
+            limit: 5000,
+        });
+        return transactions || [];
+    }
+    return Transaction.find({ userId: new mongoose.Types.ObjectId(userId) })
+        .limit(10000)
+        .lean();
+};
+
+// Return the user's tax rules and the tax they imply on income, expenses and overall.
+const getTaxInfo = async (userId) => {
+    const taxes = await loadUserTaxes(userId);
+    if (!taxes.length) {
+        return {
+            hasTaxes: false,
+            message: "No tax rules are defined. Suggest the user add them on the Taxes page.",
+            taxRules: [],
+        };
+    }
+
+    const transactions = await loadAllTransactions(userId);
+    const summary = summarizeTransactionTaxes(transactions, taxes);
+
+    return {
+        hasTaxes: true,
+        taxRules: taxes.map((t) => ({
+            name: t.name,
+            type: t.type,
+            rate: t.rate,
+            amount: t.amount,
+            appliesTo: t.appliesTo,
+            compound: t.compound,
+            active: t.active,
+        })),
+        incomeBase: summary.incomeBase,
+        expenseBase: summary.expenseBase,
+        taxOnIncome: summary.incomeTax,
+        taxOnExpense: summary.expenseTax,
+        totalTax: summary.totalTax,
+        transactionsConsidered: transactions.length,
+    };
+};
+
 // Tool definition for Groq
 const tools = [
     {
@@ -248,6 +297,17 @@ const tools = [
                 }
             }
         }
+    },
+    {
+        type: "function",
+        function: {
+            name: "getTaxInfo",
+            description: "Get the user's configured tax rules and the resulting tax owed on their income, expenses, and overall. Use this for ANY question about taxes — VAT, GST, sales tax, tax liability, tax rules, or 'how much tax do I owe'.",
+            parameters: {
+                type: "object",
+                properties: {}
+            }
+        }
     }
 ];
 
@@ -281,6 +341,10 @@ QUERY RULES:
 - For period comparisons (e.g. 2024 vs 2023) make SEPARATE calls per period
 - Prefer ONE optimised call when possible
 - IMPORTANT: Omit optional parameters entirely — never pass null for any field
+
+TAX RULES:
+- For ANY tax question (taxes, VAT, GST, sales tax, tax liability, "how much tax do I owe", "what are my tax rules") → call getTaxInfo
+- If getTaxInfo returns hasTaxes:false, tell the user no tax rules are set up and they can add them on the Taxes page
 
 SUGGESTED QUESTIONS: End every response with ---SUGGESTED--- then a JSON array of 3-4 follow-up questions:
 ---SUGGESTED---
@@ -339,6 +403,8 @@ Current date: ${new Date().toISOString().split('T')[0]}`;
                     let result;
                     if (functionName === 'queryTransactions') {
                         result = await queryTransactions(userId, functionArgs);
+                    } else if (functionName === 'getTaxInfo') {
+                        result = await getTaxInfo(userId);
                     } else {
                         result = { error: 'Unknown function' };
                     }

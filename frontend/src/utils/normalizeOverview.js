@@ -31,6 +31,7 @@ export function normalizeOverview(raw = {}) {
   const cashFlow = pickNumber('cashFlow', 'cash', 'cash_flow', 'liquidity') ?? _summary.cashFlow ?? _summary.bankBalance;
   const expenses = pickNumber('expenses', 'totalExpenses', 'costs') ?? _summary.expenses;
   const growthPct = pickNumber('growthPct', 'growthPercent', 'growth') ?? _summary.monthlyGrowth;
+  const taxLiability = pickNumber('taxLiability', 'taxEstimate') ?? _summary.taxLiability ?? _summary.taxEstimate;
 
   const aiSummary = pickString('aiSummary')
     || (raw.ai && typeof raw.ai === 'object' && typeof raw.ai.summary === 'string' ? raw.ai.summary : null)
@@ -109,6 +110,8 @@ export function normalizeOverview(raw = {}) {
     cashFlowRaw: cashFlow,
     expenses: formatCurrency(expenses) || undefined,
     expensesRaw: expenses,
+    taxLiability: formatCurrency(taxLiability) || undefined,
+    taxLiabilityRaw: taxLiability,
     growthPct: growthFormatted,
     growthRaw: _growth,
     kpiComparison: growthFormatted ?? '--',

@@ -7,6 +7,7 @@ const KPITile = ({ label, value, delta, tone = "blue", primary = false }) => {
     rose:   "#D8315B",
     violet: "#8b5cf6",
     cyan:   "#06b6d4",
+    amber:  "#f59e0b",
   };
   const color = toneColor[tone] || toneColor.blue;
 

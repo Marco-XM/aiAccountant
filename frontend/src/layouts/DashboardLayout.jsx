@@ -94,12 +94,13 @@ const DashboardLayout = () => {
           </div>
 
           {/* KPI Row */}
-          <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-            <KPITile primary label="Revenue"   value={overview?.revenue   ?? "$--"} delta={overview?.growthPct} tone="blue"   />
-            <KPITile       label="Expenses"   value={overview?.expenses  ?? "$--"}                             tone="rose"   />
-            <KPITile       label="Net Profit" value={overview?.netProfit ?? "$--"}                             tone="green"  />
-            <KPITile       label="Cash Flow"  value={overview?.cashFlow  ?? "$--"}                             tone="cyan"   />
-            <KPITile       label="Growth"     value={overview?.growthPct ?? "--%"}                             tone="violet" />
+          <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+            <KPITile primary label="Revenue"   value={overview?.revenue      ?? "$--"} delta={overview?.growthPct} tone="blue"   />
+            <KPITile       label="Expenses"   value={overview?.expenses     ?? "$--"}                             tone="rose"   />
+            <KPITile       label="Net Profit" value={overview?.netProfit    ?? "$--"}                             tone="green"  />
+            <KPITile       label="Tax"        value={overview?.taxLiability ?? "$--"}                             tone="amber"  />
+            <KPITile       label="Cash Flow"  value={overview?.cashFlow     ?? "$--"}                             tone="cyan"   />
+            <KPITile       label="Growth"     value={overview?.growthPct    ?? "--%"}                             tone="violet" />
           </div>
         </div>
       </div>

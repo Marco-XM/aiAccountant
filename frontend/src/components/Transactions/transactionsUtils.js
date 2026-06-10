@@ -84,6 +84,12 @@ export const normalizeTransaction = (transaction = {}) => {
     tags: Array.isArray(transaction.tags) ? transaction.tags : [],
     date: dateValue,
     note: transaction.note || transaction.notes || "",
+    // Tax owed on this row, computed server-side from the user's saved tax rules.
+    taxAmount: Number(transaction.taxAmount) || 0,
+    totalWithTax:
+      transaction.totalWithTax != null
+        ? Number(transaction.totalWithTax) || 0
+        : (Number.isNaN(amount) ? 0 : Math.abs(amount)) + (Number(transaction.taxAmount) || 0),
   };
 };
 

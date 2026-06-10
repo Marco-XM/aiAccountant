@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const Transaction = require("../models/Transaction");
 const localTransactionStore = require("../services/localTransactionStore");
 const { isMongoObjectId } = require("../services/userIdentity");
+const { loadUserTaxes } = require("../services/taxService");
 const { calculateDashboard } = require("./dashboardController");
 
 const isDatabaseReady = () => mongoose.connection.readyState === 1;
@@ -188,7 +189,8 @@ const v1GetDashboard = async (req, res) => {
     transactions = await Transaction.find({ userId }).lean();
   }
 
-  const summary = calculateDashboard(transactions);
+  const taxes = await loadUserTaxes(userId);
+  const summary = calculateDashboard(transactions, taxes);
   return res.json({ dashboard: summary });
 };
 
