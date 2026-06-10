@@ -181,7 +181,10 @@ const getStats = async ({ userId, category, status, type, search, dateFrom, date
       accumulator.totalTransactions += 1;
       if (normalizeType(transaction.type) === "income") accumulator.totalIncome += amount;
       if (normalizeType(transaction.type) === "expense") accumulator.totalExpenses += amount;
-      if (["needs_review", "pending"].includes(normalizeStatus(transaction.status))) accumulator.pendingCount += 1;
+      const status = normalizeStatus(transaction.status);
+      if (["needs_review", "pending"].includes(status)) accumulator.pendingCount += 1;
+      if (status === "needs_review") accumulator.needsReviewCount += 1;
+      if (["pending", "flagged"].includes(status)) accumulator.reconciliationCount += 1;
       return accumulator;
     },
     {
@@ -189,6 +192,8 @@ const getStats = async ({ userId, category, status, type, search, dateFrom, date
       totalIncome: 0,
       totalExpenses: 0,
       pendingCount: 0,
+      needsReviewCount: 0,
+      reconciliationCount: 0,
     },
   );
 
@@ -204,6 +209,10 @@ const getStats = async ({ userId, category, status, type, search, dateFrom, date
   return {
     summary,
     categoryBreakdown: Array.from(categoryMap.values()).sort((left, right) => right.totalAmount - left.totalAmount),
+    // Operations snapshot tiles (consumed by the dashboard)
+    pendingReconciliations: summary.reconciliationCount,
+    unreviewedCount: summary.needsReviewCount,
+    uploadsInProgress: 0,
   };
 };
 

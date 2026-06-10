@@ -2484,6 +2484,12 @@ const getTransactionStats = async (req, res) => {
               $cond: [{ $in: ["$status", ["needs_review", "pending"]] }, 1, 0],
             },
           },
+          needsReviewCount: {
+            $sum: { $cond: [{ $eq: ["$status", "needs_review"] }, 1, 0] },
+          },
+          reconciliationCount: {
+            $sum: { $cond: [{ $in: ["$status", ["pending", "flagged"]] }, 1, 0] },
+          },
         },
       },
     ]);
@@ -2503,14 +2509,22 @@ const getTransactionStats = async (req, res) => {
     console.log("Stats calculated:", stats[0]);
     console.log("Category breakdown count:", categoryStats.length);
 
+    const summaryDoc = stats[0] || {
+      totalTransactions: 0,
+      totalIncome: 0,
+      totalExpenses: 0,
+      pendingCount: 0,
+      needsReviewCount: 0,
+      reconciliationCount: 0,
+    };
+
     const result = {
-      summary: stats[0] || {
-        totalTransactions: 0,
-        totalIncome: 0,
-        totalExpenses: 0,
-        pendingCount: 0,
-      },
+      summary: summaryDoc,
       categoryBreakdown: categoryStats,
+      // Operations snapshot tiles (consumed by the dashboard)
+      pendingReconciliations: summaryDoc.reconciliationCount || 0,
+      unreviewedCount: summaryDoc.needsReviewCount || 0,
+      uploadsInProgress: 0,
     };
 
     res.json(result);

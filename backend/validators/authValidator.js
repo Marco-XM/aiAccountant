@@ -8,8 +8,8 @@ const registerValidation = [
     .withMessage("Name is required")
     .isLength({ min: 3, max: 50 })
     .withMessage("Name must be between 3 and 50 characters")
-    .matches(/^[a-zA-Z\s]+$/)
-    .withMessage("Name can only contain letters and spaces"),
+    .matches(/^[\p{L}\s'.-]+$/u)
+    .withMessage("Name can only contain letters, spaces, apostrophes, hyphens, and periods"),
 
   body("email")
     .trim()
