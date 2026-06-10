@@ -2418,7 +2418,11 @@ const getTransactionStats = async (req, res) => {
 
     console.log("Fetching stats for user:", userId);
 
-    const filter = { userId };
+    // Aggregation pipelines are NOT cast by Mongoose like find() is, so a string
+    // userId would never match the ObjectId-typed field (every stat comes back 0).
+    // Cast it explicitly. (We only reach the aggregate path when userId is a valid
+    // ObjectId — the local-store branch returns earlier.)
+    const filter = { userId: new mongoose.Types.ObjectId(String(userId)) };
     if (category) filter.category = category;
     if (status) filter.status = normalizeStatus(status) || status;
     if (type) {
