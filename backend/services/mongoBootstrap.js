@@ -106,7 +106,34 @@ const connectOne = async ({ uri, label, attempt, totalAttempts }) => {
   );
 };
 
+// Indexes left over from older schema versions that no current model defines.
+// `.init()` (below) only *creates* schema indexes — it never removes orphaned
+// ones — so these must be dropped explicitly. `username_1` was a unique index on
+// a `username` field the User schema no longer has, which made every signup after
+// the first fail with `E11000 dup key { username: null }`.
+const DEPRECATED_INDEXES = [{ collection: "users", index: "username_1" }];
+
+const dropDeprecatedIndexes = async () => {
+  const db = mongoose.connection.db;
+  if (!db) return;
+
+  for (const { collection, index } of DEPRECATED_INDEXES) {
+    try {
+      const existing = await db.collection(collection).indexes();
+      if (existing.some((idx) => idx.name === index)) {
+        await db.collection(collection).dropIndex(index);
+        console.log(`[mongo] phase=index-cleanup dropped=${collection}.${index}`);
+      }
+    } catch (error) {
+      // Non-fatal: collection may not exist yet, or the index may already be gone.
+      console.warn(`[mongo] phase=index-cleanup skipped=${collection}.${index} message=${error.message}`);
+    }
+  }
+};
+
 const validateIndexes = async () => {
+  await dropDeprecatedIndexes();
+
   const modelNames = mongoose.modelNames();
   if (!modelNames.length) {
     return;

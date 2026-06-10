@@ -175,7 +175,26 @@ const calculateDashboard = (transactions = []) => {
     });
   }
 
+  // Next-month projection from the recent monthly trend (simple moving average).
+  const forecast = (() => {
+    const fmt = (value) =>
+      new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value);
+    const recent = trends.slice(-3);
+    if (!recent.length) {
+      return { nextRevenue: 0, nextProfit: 0, summary: "Not enough history to forecast yet — add more transactions." };
+    }
+    const avg = (key) => recent.reduce((sum, point) => sum + (point[key] || 0), 0) / recent.length;
+    const nextRevenue = avg("income");
+    const nextProfit = avg("profit");
+    return {
+      nextRevenue,
+      nextProfit,
+      summary: `Projected next month: ~${fmt(nextRevenue)} revenue, ~${fmt(nextProfit)} net.`,
+    };
+  })();
+
   return {
+    forecast,
     summary: {
       totalTransactions: rows.length,
       revenue,
