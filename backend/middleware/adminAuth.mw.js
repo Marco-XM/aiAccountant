@@ -17,7 +17,8 @@ const adminAuth = (req, res, next) => {
       return res.status(403).json({ message: "Forbidden. Admin access required." });
     }
 
-    req.user = decoded;
+    // Expose both `_id` and `id` (tokens are signed with `_id`).
+    req.user = { ...decoded, id: decoded._id || decoded.id, _id: decoded._id || decoded.id };
     next();
   } catch (err) {
     if (err.name === "TokenExpiredError") {

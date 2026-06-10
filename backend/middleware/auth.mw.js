@@ -28,7 +28,9 @@ const authMiddleware = (req, res, next) => {
     }
 
     const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded;
+    // Tokens are signed with `_id` (see authController.signToken). Expose both
+    // `_id` and `id` so controllers can use either convention consistently.
+    req.user = { ...decoded, id: decoded._id || decoded.id, _id: decoded._id || decoded.id };
     next();
   } catch (err) {
     if (err.name === "TokenExpiredError") {
