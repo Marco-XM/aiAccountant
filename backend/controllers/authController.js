@@ -46,7 +46,7 @@ const isAdminEmail = (email) =>
 const signToken = (user) => {
   const email = user.email || "";
   return jwt.sign(
-    { _id: user._id || user.id, email, isAdmin: isAdminEmail(email) },
+    { _id: user._id || user.id, email, isAdmin: isAdminEmail(email) || Boolean(user.isAdmin) },
     JWT_SECRET,
     { expiresIn: JWT_CONFIG.EXPIRES_IN }
   );

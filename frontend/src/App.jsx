@@ -28,6 +28,7 @@ const AIChartsPage = React.lazy(() => import("./pages/AICharts/AIChartsPage.jsx"
 import ProtectedRoute from "./Component/ProtectedRoute/ProtectedRoute.jsx";
 import ExcelUploadPage from "./components/ExcelEditor/ExcelUploadPage.jsx";
 import ExcelEditorPage from "./components/ExcelEditor/ExcelEditorPage.jsx";
+import TaxesPage from "./pages/Taxes/TaxesPage.jsx";
 import LandingPage from "./pages/Landing/LandingPage.jsx";
 import PricingPage from "./pages/Pricing/PricingPage.jsx";
 import CheckoutPage from "./pages/Checkout/CheckoutPage.jsx";
@@ -119,6 +120,7 @@ function AppShell() {
     const p = location.pathname;
     if (p === base || p === `${base}/`) return "Dashboard";
     if (p.includes("/transactions")) return "Transactions";
+    if (p.includes("/taxes")) return "Tax Management";
     if (p.includes("/ai-excel")) return "AI Excel Generator";
     if (p.includes("/excel-editor") || p.includes("/excel/")) return "Excel Editor";
     if (p.includes("/chatbot")) return "AI Chatbot";
@@ -133,6 +135,7 @@ function AppShell() {
   const navItems = [
     { seg: "", label: "Dashboard", icon: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" },
     { seg: "transactions", label: "Transactions", icon: "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" },
+    { seg: "taxes", label: "Taxes", icon: "M9 14l6-6m-5.5.5h.01m4.99 5h.01M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z" },
     { seg: "box-calculator", label: "Calculator", icon: "M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" },
     { seg: "ai-excel", label: "AI Excel Generator", icon: "M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" },
     { seg: "excel-editor", label: "Excel Editor", icon: "M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" },
@@ -236,6 +239,7 @@ function AppShell() {
             <Route path="box-calculator" element={<ProtectedRoute><ExcelGenerator /></ProtectedRoute>} />
             <Route path="ai-excel" element={<ProtectedRoute><AIExcelGenerator /></ProtectedRoute>} />
             <Route path="excel-editor" element={<ProtectedRoute><ExcelUploadPage /></ProtectedRoute>} />
+            <Route path="taxes" element={<ProtectedRoute><TaxesPage /></ProtectedRoute>} />
             <Route path="excel/:fileId" element={<ProtectedRoute><ExcelEditorPage /></ProtectedRoute>} />
             <Route path="chatbot" element={<ProtectedRoute><Chatbot /></ProtectedRoute>} />
             <Route path="charts" element={<ProtectedRoute><React.Suspense fallback={<div className="p-6">Loading AI Charts...</div>}><RouteErrorBoundary><AIChartsPage /></RouteErrorBoundary></React.Suspense></ProtectedRoute>} />

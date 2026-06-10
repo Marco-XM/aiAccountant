@@ -20,14 +20,6 @@ const monthKey = (value) => {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 };
 
-const startOfMonth = (offset = 0) => {
-  const date = new Date();
-  date.setDate(1);
-  date.setHours(0, 0, 0, 0);
-  date.setMonth(date.getMonth() + offset);
-  return date;
-};
-
 const calculateDashboard = (transactions = []) => {
   const rows = transactions.map((transaction) => ({
     ...transaction,
@@ -40,18 +32,20 @@ const calculateDashboard = (transactions = []) => {
     vendor: transaction.vendor || transaction.payee || "",
   }));
 
-  const currentMonthStart = startOfMonth(0);
-  const previousMonthStart = startOfMonth(-1);
-  const nextMonthStart = startOfMonth(1);
+  // "Current" and "previous" are the two most recent months that actually have
+  // activity — not necessarily the current calendar month — so month-over-month
+  // metrics (growth, KPI comparison, tax reserve) stay meaningful even when the
+  // latest data isn't from the current calendar month.
+  const monthsWithData = [
+    ...new Set(rows.map((row) => monthKey(row.date)).filter((key) => key !== "Unknown")),
+  ].sort();
+  const currentMonthCode = monthsWithData[monthsWithData.length - 1] || monthKey(new Date());
+  const previousMonthCode = monthsWithData[monthsWithData.length - 2] || null;
 
-  const currentRows = rows.filter((row) => {
-    const date = new Date(row.date);
-    return !Number.isNaN(date.getTime()) && date >= currentMonthStart && date < nextMonthStart;
-  });
-  const previousRows = rows.filter((row) => {
-    const date = new Date(row.date);
-    return !Number.isNaN(date.getTime()) && date >= previousMonthStart && date < currentMonthStart;
-  });
+  const currentRows = rows.filter((row) => monthKey(row.date) === currentMonthCode);
+  const previousRows = previousMonthCode
+    ? rows.filter((row) => monthKey(row.date) === previousMonthCode)
+    : [];
 
   const sumByType = (items, type) =>
     items.filter((item) => item.type === type).reduce((sum, item) => sum + item.amount, 0);

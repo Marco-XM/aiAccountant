@@ -11,6 +11,10 @@ const userSchema = new mongoose.Schema(
       required: true,
     },
 
+    // Admin access. A user is an admin if this flag is set OR their email is in
+    // the ADMIN_EMAILS env list (see authController.isAdminEmail).
+    isAdmin: { type: Boolean, default: false },
+
     // Password reset (store only a hash of the reset token)
     resetPasswordTokenHash: { type: String },
     resetPasswordExpiresAt: { type: Date },

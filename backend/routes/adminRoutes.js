@@ -5,6 +5,7 @@ const {
   getStats,
   getUsers,
   updateUserSubscription,
+  setUserAdmin,
   deleteUser,
   getBlogPosts,
   getBlogPost,
@@ -35,6 +36,7 @@ router.get("/stats", getStats);
 // Users
 router.get("/users", getUsers);
 router.put("/users/:id/subscription", updateUserSubscription);
+router.patch("/users/:id/admin", setUserAdmin);
 router.delete("/users/:id", deleteUser);
 
 // Blog

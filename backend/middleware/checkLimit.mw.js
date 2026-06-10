@@ -12,9 +12,25 @@
  *    usageService.increment(userId, feature) after its successful operation.
  *    (We do NOT increment here because we don't know if the controller succeeded.)
  */
+const mongoose        = require("mongoose");
+const Subscription    = require("../models/Subscription");
 const localSubStore   = require("../services/localSubscriptionStore");
 const localTierStore  = require("../services/localTierStore");
 const usageService    = require("../services/usageService");
+
+const dbReady = () => mongoose.connection.readyState === 1;
+
+// Resolve the user's plan id from the same place `subscribe` writes it.
+// In production that's MongoDB; in local dev it's the file-backed store.
+const resolvePlanId = async (userId) => {
+  if (dbReady()) {
+    const sub = await Subscription.findOne({ user: userId }).lean();
+    return sub?.plan || "free";
+  }
+  let sub = await localSubStore.findByUserId(userId);
+  if (!sub) sub = await localSubStore.createDefaultSubscription(userId);
+  return sub.plan || "free";
+};
 
 const FEATURE_LABELS = {
   transactions:       "transactions",
@@ -33,10 +49,8 @@ const checkLimit = (feature) => async (req, res, next) => {
     const userId = req.user?._id;
     if (!userId) return res.status(401).json({ message: "Not authenticated." });
 
-    // Get user's current plan
-    let sub = await localSubStore.findByUserId(userId);
-    if (!sub) sub = await localSubStore.createDefaultSubscription(userId);
-    const planId = sub.plan || "free";
+    // Get user's current plan (MongoDB in production, file store in local dev)
+    const planId = await resolvePlanId(userId);
 
     // Get live tier (admin-editable)
     const tier = await localTierStore.getTierById(planId);

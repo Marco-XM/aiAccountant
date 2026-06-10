@@ -362,6 +362,16 @@ export const api = {
     overview: () => safeRequest(() => apiClient.get("/dashboard/overview")),
   },
 
+  // Taxes
+  taxes: {
+    list: () => apiClient.get("/taxes"),
+    create: (data) => apiClient.post("/taxes", data),
+    update: (id, data) => apiClient.put(`/taxes/${id}`, data),
+    remove: (id) => apiClient.delete(`/taxes/${id}`),
+    calculate: (data) => apiClient.post("/taxes/calculate", data),
+    report: () => apiClient.get("/taxes/report"),
+  },
+
   // Chat
   chat: {
     getSessions: () => apiClient.get("/chat/sessions"),

@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const User = require("../models/User");
+const Subscription = require("../models/Subscription");
 const BlogPost = require("../models/BlogPost");
 const localAuth = require("../services/localAuthStore");
 const localSub = require("../services/localSubscriptionStore");
@@ -96,6 +97,16 @@ const getUsers = async (req, res) => {
         .lean()
         .select("-password -resetPasswordTokenHash");
       users = dbUsers.map((u) => ({ ...u, id: u._id.toString() }));
+
+      const subs = await Subscription.find({}).lean();
+      subscriptions = subs.reduce((acc, sub) => {
+        acc[String(sub.user)] = {
+          plan: sub.plan,
+          status: sub.status,
+          cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
+        };
+        return acc;
+      }, {});
     }
 
     const enriched = users.map((u) => {
@@ -110,6 +121,7 @@ const getUsers = async (req, res) => {
         plan: sub.plan || "free",
         subscriptionStatus: sub.status || "active",
         cancelAtPeriodEnd: sub.cancelAtPeriodEnd || false,
+        isAdmin: Boolean(u.isAdmin) || isAdminEmail(u.email),
       };
     });
 
@@ -141,12 +153,55 @@ const updateUserSubscription = async (req, res) => {
         currentPeriodStart: new Date().toISOString(),
         currentPeriodEnd: localSub.getPeriodEnd("monthly"),
       });
+    } else {
+      await Subscription.findOneAndUpdate(
+        { user: id },
+        {
+          plan,
+          status: "active",
+          cancelAtPeriodEnd: false,
+          currentPeriodStart: new Date(),
+          currentPeriodEnd: localSub.getPeriodEnd("monthly"),
+        },
+        { upsert: true, new: true }
+      );
     }
 
     res.json({ message: `User plan updated to ${plan}.` });
   } catch (err) {
     console.error("updateUserSubscription error:", err);
     res.status(500).json({ message: "Failed to update subscription." });
+  }
+};
+
+const setUserAdmin = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { isAdmin } = req.body;
+    if (typeof isAdmin !== "boolean") {
+      return res.status(400).json({ message: "isAdmin (boolean) is required." });
+    }
+
+    if (useLocal()) {
+      if (typeof localAuth.updateUser !== "function") {
+        return res
+          .status(501)
+          .json({ message: "Admin promotion requires a database connection." });
+      }
+      await localAuth.updateUser(id, { isAdmin });
+    } else {
+      const user = await User.findByIdAndUpdate(id, { isAdmin }, { new: true });
+      if (!user) return res.status(404).json({ message: "User not found." });
+    }
+
+    res.json({
+      message: isAdmin
+        ? "User promoted to admin. They get admin access on their next login."
+        : "Admin access revoked.",
+    });
+  } catch (err) {
+    console.error("setUserAdmin error:", err);
+    res.status(500).json({ message: "Failed to update admin access." });
   }
 };
 
@@ -353,6 +408,7 @@ module.exports = {
   getStats,
   getUsers,
   updateUserSubscription,
+  setUserAdmin,
   deleteUser,
   getBlogPosts,
   getBlogPost,

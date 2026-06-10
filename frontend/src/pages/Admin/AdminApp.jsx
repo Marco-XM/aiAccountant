@@ -441,6 +441,16 @@ function AdminUsers() {
     setUpdating(null);
   };
 
+  const toggleAdmin = async (userId, isAdmin, email) => {
+    if (!confirm(isAdmin ? `Grant admin access to ${email}?` : `Revoke admin access from ${email}?`)) return;
+    setUpdating(userId);
+    try {
+      await adminFetch(`/users/${userId}/admin`, { method: "PATCH", body: JSON.stringify({ isAdmin }) });
+      setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, isAdmin } : u)));
+    } catch (e) { alert(e.message); }
+    setUpdating(null);
+  };
+
   const deleteUser = async (userId, email) => {
     if (!confirm(`Delete user ${email}? This cannot be undone.`)) return;
     try {
@@ -480,7 +490,7 @@ function AdminUsers() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
-                {["User", "Business", "Plan", "Joined", "Actions"].map((h) => (
+                {["User", "Business", "Plan", "Role", "Joined", "Actions"].map((h) => (
                   <th key={h} className="px-5 py-3.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">{h}</th>
                 ))}
               </tr>
@@ -508,6 +518,19 @@ function AdminUsers() {
                         : ["free", "pro", "business"].map((p) => <option key={p} value={p}>{p}</option>)}
                     </select>
                   </td>
+                  <td className="px-5 py-3.5">
+                    <div className="flex items-center gap-2">
+                      <Badge color={user.isAdmin ? "purple" : "slate"}>{user.isAdmin ? "Admin" : "User"}</Badge>
+                      <Btn
+                        onClick={() => toggleAdmin(user.id, !user.isAdmin, user.email)}
+                        variant={user.isAdmin ? "ghost" : "secondary"}
+                        size="sm"
+                        disabled={updating === user.id}
+                      >
+                        {user.isAdmin ? "Revoke" : "Make admin"}
+                      </Btn>
+                    </div>
+                  </td>
                   <td className="px-5 py-3.5 text-slate-500">
                     {user.createdAt ? new Date(user.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"}
                   </td>
@@ -517,7 +540,7 @@ function AdminUsers() {
                 </tr>
               ))}
               {filtered.length === 0 && (
-                <tr><td colSpan={5} className="px-5 py-12 text-center text-slate-400">No users found.</td></tr>
+                <tr><td colSpan={6} className="px-5 py-12 text-center text-slate-400">No users found.</td></tr>
               )}
             </tbody>
           </table>
