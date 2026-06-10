@@ -420,7 +420,11 @@ const LedgerTable = ({
         </div>
       </div>
 
-      <div className="hidden min-w-0 lg:block">
+      {/* Horizontal-scroll wrapper keeps every column reachable at any screen
+          size; the min-width forces a scrollbar instead of squashing columns,
+          and the header + rows share it so they scroll together. */}
+      <div className="min-w-0 overflow-x-auto">
+        <div className="min-w-[1000px]">
         <div className="grid w-full border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900" style={{ gridTemplateColumns: gridTemplate }}>
           <button type="button" onClick={onSelectAll} className="grid place-items-center px-3 py-3">
             <span className={classNames("h-4 w-4 rounded border", selectedAll ? "border-blue-500 bg-blue-500" : "border-slate-300 dark:border-slate-600")} />
@@ -435,7 +439,7 @@ const LedgerTable = ({
           <div className="px-3 py-3 text-right text-xs font-bold uppercase tracking-[.12em] text-slate-500">Actions</div>
         </div>
 
-        <div onScroll={handleScroll} className="relative min-w-0 overflow-y-auto overflow-x-hidden" style={{ height }}>
+        <div onScroll={handleScroll} className="relative overflow-y-auto" style={{ height }}>
           {loading && !rows.length ? (
             <div className="p-4"><SkeletonLoader rows={8} /></div>
           ) : error ? (
@@ -522,9 +526,10 @@ const LedgerTable = ({
             </div>
           )}
         </div>
+        </div>
       </div>
 
-      <div className="grid gap-3 p-3 lg:hidden">
+      <div className="hidden">
         {loading && !rows.length ? <SkeletonLoader rows={6} /> : null}
         {!loading && !rows.length ? (
           <div className="rounded-2xl border border-dashed border-slate-300 p-6 text-center dark:border-slate-700">
