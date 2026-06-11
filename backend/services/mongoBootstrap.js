@@ -108,10 +108,14 @@ const connectOne = async ({ uri, label, attempt, totalAttempts }) => {
 
 // Indexes left over from older schema versions that no current model defines.
 // `.init()` (below) only *creates* schema indexes — it never removes orphaned
-// ones — so these must be dropped explicitly. `username_1` was a unique index on
-// a `username` field the User schema no longer has, which made every signup after
-// the first fail with `E11000 dup key { username: null }`.
-const DEPRECATED_INDEXES = [{ collection: "users", index: "username_1" }];
+// ones — so these must be dropped explicitly. These were unique indexes on a
+// user-name field the User schema no longer has, which made every signup after
+// the first fail with `E11000 dup key { userName: null }`. The live index is
+// named `userName_1` (camelCase); `username_1` is kept for older environments.
+const DEPRECATED_INDEXES = [
+  { collection: "users", index: "userName_1" },
+  { collection: "users", index: "username_1" },
+];
 
 const dropDeprecatedIndexes = async () => {
   const db = mongoose.connection.db;

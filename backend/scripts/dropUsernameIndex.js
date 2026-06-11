@@ -1,9 +1,13 @@
-// One-off fix: drop the stale unique `username_1` index from the users collection.
+// One-off fix: drop the stale unique user-name index from the users collection.
 //
-// An older User schema had a unique `username` field. The current schema removed
-// it, so every new user is inserted with `username: null`. The leftover unique
-// index allows that exactly once, so every signup after the first fails with:
-//   E11000 duplicate key error: index: username_1 dup key: { username: null }
+// An older User schema had a unique user-name field. The current schema removed
+// it, so every new user is inserted with that field absent (indexed as `null`).
+// The leftover unique index allows that exactly once, so every signup after the
+// first fails with:
+//   E11000 duplicate key error: index: userName_1 dup key: { userName: null }
+//
+// The live index is named `userName_1` (camelCase); `username_1` is also dropped
+// in case an older environment created the lowercase variant.
 //
 // Run against the target database (set MONGODB_URI in the environment or .env):
 //   node backend/scripts/dropUsernameIndex.js
@@ -14,7 +18,7 @@
 require("dotenv").config();
 const mongoose = require("mongoose");
 
-const INDEX_NAME = "username_1";
+const INDEX_NAMES = ["userName_1", "username_1"];
 const COLLECTION = "users";
 
 (async () => {
@@ -32,13 +36,20 @@ const COLLECTION = "users";
     indexes.map((idx) => idx.name),
   );
 
-  if (indexes.some((idx) => idx.name === INDEX_NAME)) {
-    await collection.dropIndex(INDEX_NAME);
-    console.log(`Dropped index ${COLLECTION}.${INDEX_NAME}.`);
-  } else {
-    console.log(`Index ${COLLECTION}.${INDEX_NAME} not found — nothing to do.`);
+  const present = new Set(indexes.map((idx) => idx.name));
+  let dropped = 0;
+
+  for (const indexName of INDEX_NAMES) {
+    if (present.has(indexName)) {
+      await collection.dropIndex(indexName);
+      console.log(`Dropped index ${COLLECTION}.${indexName}.`);
+      dropped += 1;
+    } else {
+      console.log(`Index ${COLLECTION}.${indexName} not found — nothing to do.`);
+    }
   }
 
+  console.log(`Done. Dropped ${dropped} index(es).`);
   await mongoose.disconnect();
 })().catch((e) => {
   console.error(e);
