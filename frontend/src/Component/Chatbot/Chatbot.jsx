@@ -4,6 +4,7 @@ import { useSearchParams, Link } from "react-router-dom";
 import { AuthContext } from "../../Context/AuthContext";
 import { useSubscription } from "../../Context/SubscriptionContext";
 import { api } from "../../config/api";
+import FormulaBox from "../../components/FormulaBox";
 
 const Chatbot = () => {
   const [searchParams] = useSearchParams();
@@ -146,6 +147,7 @@ const Chatbot = () => {
         role: "model",
         content: response.data.message,
         suggestedQuestions: response.data.suggestedQuestions || [],
+        formulas: response.data.formulas || [],
       };
       const newMessages = [...updatedMessages, aiMessage];
       setMessages(newMessages);
@@ -405,6 +407,17 @@ const Chatbot = () => {
                   </div>
                 </div>
               </div>
+
+              {/* Formulas behind any calculated numbers in this AI message */}
+              {msg.role === "model" &&
+                msg.formulas &&
+                msg.formulas.length > 0 && (
+                  <div className="flex justify-start mt-3 animate-fadeIn">
+                    <div className="max-w-3xl w-full" style={{ maxWidth: "85%" }}>
+                      <FormulaBox formulas={msg.formulas} />
+                    </div>
+                  </div>
+                )}
 
               {/* Show suggested questions for AI messages */}
               {msg.role === "model" &&

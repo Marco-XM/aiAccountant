@@ -59,7 +59,7 @@ const FiltersSidebar = ({
           </select>
           <button type="button" disabled={generating || loadingWorkspace}
             onClick={() => onGenerate?.(prompt)}
-            className="rounded-xl border border-cyan-400/30 bg-cyan-500/20 px-3 py-2 text-sm font-semibold text-cyan-100 disabled:opacity-50">
+            className="rounded-xl border border-[color:var(--ui-accent)] bg-[color:var(--ui-accent)] px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:brightness-105 disabled:opacity-50">
             {generating ? "Analyzing…" : "Generate"}
           </button>
         </div>

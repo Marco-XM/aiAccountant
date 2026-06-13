@@ -23,6 +23,14 @@ const toNumber = (value, fallback = 0) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+// Format a number as USD for display inside formula strings.
+const fmtMoney = (value) =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 2,
+  }).format(toNumber(value, 0));
+
 const normalizeTransaction = (item) => {
   const date = item?.date ? new Date(item.date) : new Date();
   const safeDate = Number.isNaN(date.getTime()) ? new Date() : date;
@@ -628,6 +636,57 @@ const buildInsights = (rows, kpis, chartPayload, anomalies) => {
   return insights;
 };
 
+// Build a transparent, auditable list of the formulas behind each KPI, with the
+// user's real numbers substituted in so they can verify the math is correct.
+const buildFormulas = (rows, kpis) => {
+  const incomeCount = rows.filter((r) => r.type === "income").length;
+  const expenseCount = rows.filter((r) => r.type === "expense").length;
+  const transferCount = rows.filter((r) => r.type === "transfer").length;
+
+  const formulas = [
+    {
+      label: "Total Income",
+      formula: `Sum of amount for all ${incomeCount} income transactions`,
+      result: fmtMoney(kpis.totalIncome),
+    },
+    {
+      label: "Total Expense",
+      formula: `Sum of amount for all ${expenseCount} expense transactions`,
+      result: fmtMoney(kpis.totalExpense),
+    },
+    {
+      label: "Net Cash Flow",
+      formula: `Total Income − Total Expense = ${fmtMoney(kpis.totalIncome)} − ${fmtMoney(kpis.totalExpense)}`,
+      result: fmtMoney(kpis.netCashFlow),
+    },
+    {
+      label: "Average Ticket",
+      formula: `(Income + Expense + Transfer) ÷ Transactions = (${fmtMoney(kpis.totalIncome)} + ${fmtMoney(kpis.totalExpense)} + ${fmtMoney(kpis.totalTransfer)}) ÷ ${kpis.totalTransactions}`,
+      result: fmtMoney(kpis.averageTicket),
+      note: transferCount ? `Includes ${transferCount} transfer transactions.` : undefined,
+    },
+  ];
+
+  if (kpis.totalIncome > 0) {
+    const ratio = (kpis.totalExpense / kpis.totalIncome) * 100;
+    formulas.push({
+      label: "Expense-to-Income Ratio",
+      formula: `Total Expense ÷ Total Income × 100 = ${fmtMoney(kpis.totalExpense)} ÷ ${fmtMoney(kpis.totalIncome)} × 100`,
+      result: `${ratio.toFixed(1)}%`,
+    });
+  }
+
+  if (kpis.totalTax > 0) {
+    formulas.push({
+      label: "Total Tax",
+      formula: "Sum of tax owed per transaction, computed from your saved tax rules",
+      result: fmtMoney(kpis.totalTax),
+    });
+  }
+
+  return formulas;
+};
+
 const maybeEnhanceInsightsWithAI = async ({ query, profile, kpis, insights }) => {
   if (!groq || !groqEnhancementEnabled) return insights;
 
@@ -667,6 +726,7 @@ const makeWorkspacePayload = async (rows) => {
   return {
     profile,
     kpis,
+    formulas: buildFormulas(rows, kpis),
     quickInsights: [
       `${kpis.totalTransactions} transactions indexed across ${profile.columns.length} detected columns.`,
       `${categories[0]?.name || "Uncategorized"} is currently the dominant category.`,
@@ -834,6 +894,7 @@ const generateChart = async (req, res) => {
         kpis: buildKpis([]),
         profile: buildDatasetProfile([]),
         insights: ["No transactions match the current filters."],
+        formulas: [],
         anomalies: [],
         recommendations: ["Try removing filters or uploading transaction data."],
       });
@@ -850,6 +911,8 @@ const generateChart = async (req, res) => {
     let insights = buildInsights(filteredRows, kpis, chart, anomalies);
     insights = await maybeEnhanceInsightsWithAI({ query, profile, kpis, insights });
 
+    const formulas = buildFormulas(filteredRows, kpis);
+
     const recommendations = [
       "Use date filters to compare quarter-over-quarter performance.",
       "Save this chart as a report to track it alongside KPI cards.",
@@ -863,6 +926,7 @@ const generateChart = async (req, res) => {
       kpis,
       profile,
       insights,
+      formulas,
       anomalies,
       recommendations,
       generatedAt: nowIso(),

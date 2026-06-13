@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import { AuthContext } from "../../Context/AuthContext";
 import { useSubscription } from "../../Context/SubscriptionContext";
 import { api, API_ORIGIN } from "../../config/api";
+import FormulaBox from "../../components/FormulaBox";
 
 const AIExcelGenerator = () => {
   const [prompt, setPrompt] = useState("");
@@ -13,6 +14,12 @@ const AIExcelGenerator = () => {
   const { token, userId } = useContext(AuthContext);
   const { isAtLimit, usage, planDetails } = useSubscription();
   const excelAtLimit = isAtLimit("aiExcelGenerations");
+
+  // Surface the cell formulas the AI wrote into the sheet so the user can audit them.
+  const excelFormulas = (generatedFile?.config?.formulas || []).map((f) => ({
+    label: `Cell ${f.cell}`,
+    formula: f.formula,
+  }));
 
   const examples = [
     "Create an excel sheet with 10 green rows where I can enter values, then save the sum in the first row second column with yellow background",
@@ -225,6 +232,16 @@ const AIExcelGenerator = () => {
                   </div>
                 </div>
               </div>
+
+              {excelFormulas.length > 0 && (
+                <FormulaBox
+                  className="mt-5"
+                  defaultOpen
+                  title="Formulas used in this sheet"
+                  subtitle="Each formula is written into the cell shown — open the file to verify the results."
+                  formulas={excelFormulas}
+                />
+              )}
             </div>
           )}
         </div>

@@ -200,6 +200,12 @@ const forgotPassword = async (req, res) => {
         if (isDev) {
           console.log("[forgotPassword] Local reset token:", resetToken);
         }
+
+        await sendPasswordResetEmail({
+          to: localUser.email || email,
+          token: resetToken,
+          origin,
+        });
       }
 
       return res.status(200).json(genericResponse);

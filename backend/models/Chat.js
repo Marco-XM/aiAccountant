@@ -21,6 +21,8 @@ const chatSchema = new mongoose.Schema({
       type: String,
       required: true
     },
+    suggestedQuestions: [{ type: String }],
+    formulas: { type: mongoose.Schema.Types.Mixed },
     timestamp: {
       type: Date,
       default: Date.now

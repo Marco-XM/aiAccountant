@@ -5,6 +5,7 @@ import FiltersSidebar from "./FiltersSidebar";
 import ChartGrid from "./ChartGrid";
 import InsightsPanel from "./InsightsPanel";
 import SavedReportsPanel from "./SavedReportsPanel";
+import FormulaBox from "../FormulaBox";
 
 const defaultFilters = { dateRange: "all", type: "all", category: "all", search: "" };
 
@@ -35,6 +36,7 @@ const WorkspaceLayout = () => {
           chart: wsRes.data.suggestedCharts[0].payload,
           insights: wsRes.data.quickInsights || [],
           kpis: wsRes.data.kpis || null,
+          formulas: wsRes.data.formulas || [],
           anomalies: [],
           recommendations: [],
           profile: wsRes.data.profile || null,
@@ -184,6 +186,15 @@ const WorkspaceLayout = () => {
           <InsightsPanel result={result} workspace={workspace} />
         </div>
 
+        {/* ── Formula transparency ──────────────────────────────────── */}
+        <FormulaBox
+          formulas={result?.formulas}
+          defaultOpen
+          title="How these KPIs were calculated"
+          subtitle="Verify the math behind the cards above against your own numbers."
+        />
+
+
         {/* ── Suggested charts ─────────────────────────────────────── */}
         {workspace?.suggestedCharts?.length ? (
           <div className="rounded-3xl border border-theme bg-surface p-5">
@@ -192,7 +203,7 @@ const WorkspaceLayout = () => {
               {workspace.suggestedCharts.map((w) => (
                 <button key={w.id} type="button"
                   onClick={() => {
-                    setResult((prev) => ({ ...(prev || {}), chart: w.payload, insights: workspace.quickInsights || [], kpis: workspace.kpis || null }));
+                    setResult((prev) => ({ ...(prev || {}), chart: w.payload, insights: workspace.quickInsights || [], kpis: workspace.kpis || null, formulas: workspace.formulas || [] }));
                     setTimeout(() => {
                       chartCanvasRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
                     }, 100);

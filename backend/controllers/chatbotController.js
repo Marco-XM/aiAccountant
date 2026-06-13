@@ -346,7 +346,12 @@ TAX RULES:
 - For ANY tax question (taxes, VAT, GST, sales tax, tax liability, "how much tax do I owe", "what are my tax rules") → call getTaxInfo
 - If getTaxInfo returns hasTaxes:false, tell the user no tax rules are set up and they can add them on the Taxes page
 
-SUGGESTED QUESTIONS: End every response with ---SUGGESTED--- then a JSON array of 3-4 follow-up questions:
+FORMULAS: Whenever your answer contains a calculated number (totals, averages, differences, ratios, tax, percentages), add a ---FORMULAS--- marker BEFORE the suggested questions, followed by a JSON array that explains each calculation with the REAL values substituted so the user can verify the math:
+---FORMULAS---
+[{"label":"Q1 Total Expenses","formula":"Jan + Feb + Mar = $1,200 + $900 + $1,100","result":"$3,200"}]
+Omit the FORMULAS section entirely if your answer has no calculations.
+
+SUGGESTED QUESTIONS: After the formulas (if any), end with ---SUGGESTED--- then a JSON array of 3-4 follow-up questions:
 ---SUGGESTED---
 ["Question 1?", "Question 2?", "Question 3?"]
 
@@ -434,25 +439,44 @@ Current date: ${new Date().toISOString().split('T')[0]}`;
 
         console.log('AI response:', finalResponse);
 
-        // Extract suggested questions if present
+        // Extract trailing sections. Order in the response: answer → FORMULAS → SUGGESTED.
         let suggestedQuestions = [];
+        let formulas = [];
         let cleanMessage = finalResponse;
-        
-        if (finalResponse.includes('---SUGGESTED---')) {
-            const parts = finalResponse.split('---SUGGESTED---');
+
+        // Suggested questions come last, so peel them off first.
+        if (cleanMessage.includes('---SUGGESTED---')) {
+            const parts = cleanMessage.split('---SUGGESTED---');
             cleanMessage = parts[0].trim();
-            
+
             try {
-                const questionsText = parts[1].trim();
-                suggestedQuestions = JSON.parse(questionsText);
+                suggestedQuestions = JSON.parse(parts[1].trim());
             } catch (e) {
                 console.error('Error parsing suggested questions:', e);
+            }
+        }
+
+        // Formulas (if any) sit between the answer and the suggested questions.
+        if (cleanMessage.includes('---FORMULAS---')) {
+            const parts = cleanMessage.split('---FORMULAS---');
+            cleanMessage = parts[0].trim();
+
+            try {
+                const parsed = JSON.parse(parts[1].trim());
+                if (Array.isArray(parsed)) {
+                    formulas = parsed
+                        .map((f) => (typeof f === 'string' ? { formula: f } : f))
+                        .filter((f) => f && (f.formula || f.expression));
+                }
+            } catch (e) {
+                console.error('Error parsing formulas:', e);
             }
         }
 
         res.json({
             message: cleanMessage,
             suggestedQuestions: suggestedQuestions,
+            formulas: formulas,
             conversationHistory: [
                 ...conversationHistory,
                 { role: 'user', content: message },
